@@ -1,9 +1,9 @@
-def wrap_to_dict(name, data, keywords):
+def wrapper_dict(data, support_keys):
     """Helper for warpping db object into dictionary"""
-    wrapper_dict = {}
+    info = {}
 
-    for key in keywords:
+    for key in support_keys:
         if key in data:
-            wrapper_dict[key] = data[key]
+            info[key] = data[key]
 
-    return wrapper_dict
+    return info

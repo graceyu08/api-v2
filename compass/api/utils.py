@@ -1,15 +1,6 @@
 """Utils for API usage."""
-import netaddr
-import re
-
-from flask.ext.restful import Api
 from flask import make_response
 import simplejson as json
-
-#from compass.api import app
-
-
-#API = Api(app)
 
 
 def make_json_response(status_code, data):
@@ -28,9 +19,3 @@ def make_csv_response(status_code, csv_data, fname):
     resp.mimetype = 'text/csv'
     resp.headers['Content-Disposition'] = 'attachment; filename="%s"' % fname
     return resp
-
-'''
-def add_resource(*args, **kwargs):
-    """Add resource."""
-    API.add_resource(*args, **kwargs)
-'''

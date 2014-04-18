@@ -5,7 +5,8 @@ from compass.db.api import database
 from compass.db.api import utils
 
 SUPPORT_FILTERS = ['email', 'admin']
-DEFAULT_RESP_FIELDS = ['id', 'email', 'is_admin', 'active']
+DEFAULT_RESP_FIELDS = ['id', 'email', 'is_admin', 'active', 'firstname',
+                       'lastname', 'created_at', 'last_login_at']
 USER = 'user'
 USERS = 'users'
 
@@ -16,10 +17,8 @@ def get_user(user_id):
        if not user:
            raise RecordNotExists(USER, user_id)
 
-       data = user.to_dict()
-     
-       user_dict = utils.wrap_to_dict(USER, data, DEFAULT_RESP_FIELDS)
-    return user_dict
+       user = utils.wrapper_dict(user.to_dict(), DEFAULT_RESP_FIELDS)
+    return user
 
 
 def _get_user(session, user_id):
@@ -67,9 +66,4 @@ def _list_permissions(session, user_id):
 
 def _get_token(session, user_id):
     """Generate a token for the user"""
-    pass
-
-
-def _auth_user(session, user_id, password):
-    """Authenticate this user"""
     pass

@@ -53,6 +53,10 @@ class TimestampMixin(object):
 class HelperMixin(object):
     def to_dict(self):
         dict_info = self.__dict__.copy()
+        columns = ['created_at', 'updated_at', 'last_login_at']
+        for key in columns:
+            if key in dict_info:
+                dict_info[key] = dict_info[key].ctime()
         dict_info.pop('_sa_instance_state')
         return dict_info
 
