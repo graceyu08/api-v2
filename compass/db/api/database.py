@@ -137,7 +137,7 @@ def create_db():
                            password='admin')#,is_admin=True)
         logging.info('Init user: %s, %s' % (user.email, user.get_password()))
         _session.add(user)
-
+        print "Checking .....\n"
         # Initialize default permissions
         permissions = []
         for perm in DEFAULT_PERMS:
@@ -158,14 +158,13 @@ def create_db():
             oses.append(models.OperatingSystem(name=name))
         _session.add_all(oses)
 
-        # Populate adapter_os table 
+        # Populate adapter_os table
         for key in ADAPTER_OS_DEF:
             adapter = adapters[key-1]
             for os_id in ADAPTER_OS_DEF[key]:
                 os = oses[os_id-1]
                 adapter.support_os.append(os)
- 
-        
+
         # Populate OS config metatdata
         os_meta= []
         for key in OS_CONFIG_META_DEF:
@@ -181,7 +180,7 @@ def create_db():
 
         _session.add_all(os_meta)
 
-        
+
         # Populate OS config field
         os_fields = []
         for field in OS_CONFIG_FIELD_DEF:
@@ -190,14 +189,14 @@ def create_db():
                 is_required=field['is_required'], ftype=field['ftype']))
         _session.add_all(os_fields)
 
-         
+
         # Populate common OS config metatdata field
         for meta_id in COMMON_OS_CONFIG_META_FIELD_DEF:
             meta = os_meta[meta_id-1]
             for field_id in COMMON_OS_CONFIG_META_FIELD_DEF[meta_id]:
                 field = os_fields[field_id-1]
                 meta.fields.append(field)
-        
+
 def drop_db():
     """Drop database."""
     models.BASE.metadata.drop_all(bind=ENGINE)

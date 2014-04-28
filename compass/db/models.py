@@ -234,7 +234,7 @@ ext_os_config_metadata_field = Table('ext_os_config_metadata_field',
 class OSConfigMetadata(BASE, MetadataMixin):
     """OS config metadata"""
     __tablename__ = "os_config_metadata"
-    
+
     id = Column(Integer, primary_key=True)
     os_id =  Column(Integer, ForeignKey('os.id'))
     #parent_id = Column(Integer, ForeignKey('os_config_metadata.id'))

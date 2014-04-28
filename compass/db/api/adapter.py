@@ -1,9 +1,9 @@
-from sqlalchemy import or_
+#from sqlalchemy import or_
 
 from compass.db.api import database
 from compass.db.api import utils
 from compass.db.api.utils import wrap_to_dict
-from compass.db.exception import *
+#from compass.db.exception import *
 from compass.db.models import Adapter
 from compass.db.models import OSConfigMetadata
 #from compass.db.models import AdapterConfigMetadata
@@ -26,7 +26,7 @@ def get_adapter(adapter_id):
        if not adapter:
            err_msg = ERROR_MSG['findNoAdapter'] % adapter_id
            raise RecordNotExists(err_msg)
-
+           # TODO(Grace): need to import RecordNotExists
        adapter_info = adapter.to_dict()
        """
        if return_role:
@@ -54,7 +54,7 @@ def list_adapters(filters=None):
     with database.session() as session:
         adapters = _list_adapters(session, filters)
         adapters_list = [adapter.to_dict() for adapter in adapters]
-            
+
     return adapters_list
 
 
@@ -88,12 +88,18 @@ def _list_adapters(session, filters=None):
 def _get_adapter_package_config_schema(session):
     pass
 
-#TODO:grace
-def _get_adapter_os_config_schema(session, os_id):
+# TODO(Grace):
+# Note to Grace: This iterative method of walking the tree is okay but
+# may not be easy to understand. So I have added a recursive version below.
+# Of course, not sure if it any easier to follow the code logic.
+# We can discuss.
+####
+# This is not used now
+def _get_adapter_os_config_schema_Grace(session, os_id):
     with session.begin(subtransactions=True):
         root = session.query(OSConfigMetadata).filter_by(name="os_config").first()
         stack = [root]
-        
+
         schema = {}
         prev = None
         while len(stack) > 0:
@@ -105,7 +111,7 @@ def _get_adapter_os_config_schema(session, os_id):
                         tmp = schema[curr.name]
                         del schema[curr.name]
                         schema[curr.parent.name].update({curr.name: tmp})
-                
+
                 stack.pop()
             else:
                 children = curr.children
@@ -116,9 +122,40 @@ def _get_adapter_os_config_schema(session, os_id):
                     fields_name = [field.field for field in fields]
                     if curr.parent.name in schema:
                         schema[curr.parent.name].update({curr.name: fields_name})
-                    else:    
+                    else:
                         schema[curr.parent.name] = {curr.name: fields_name}
                     stack.pop()
             prev = curr
-        
+
         return schema
+
+# TODO(Grace): TMP method
+def _get_adapter_os_config_schema(session, os_id):
+    output_dict = {}
+
+    with session.begin(subtransactions=True):
+        root = session.query(OSConfigMetadata).filter_by(name="os_config").first()
+
+        os_config_dict = {"_name" : "os_config" }
+        output_dict["os_config"] = os_config_dict
+        _get_adapter_os_config_internal(root, os_config_dict, output_dict)
+
+    return output_dict
+
+### A recursive function
+# This assumes that only leaf nodes have field entry and that
+# an intermediate node in config_metadata table does not have field entries
+def _get_adapter_os_config_internal(node, current_dict, parent_dict):
+    children = node.children
+
+    if children:
+        for c in children:
+            child_dict = {"_name" : c.name}
+            current_dict[c.name] = child_dict
+            _get_adapter_os_config_internal(c, child_dict, current_dict)
+        del current_dict["_name"]
+    else:
+        fields = node.fields
+        fields_name = [field.field for field in fields]
+        parent_dict[current_dict["_name"]] = fields_name
+

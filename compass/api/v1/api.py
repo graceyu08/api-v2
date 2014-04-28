@@ -14,7 +14,6 @@
 
 """Define all the RestfulAPI entry points."""
 import logging
-import simplejson as json
 
 from flask import Blueprint
 from flask import request
@@ -34,7 +33,6 @@ PREFIX = '/v1.0'
 
 @v1_app.route('/users', methods=['GET'])
 def list_users():
-    
     emails = request.args.getlist('email')
     is_admin = request.args.get('admin')
 
@@ -42,13 +40,13 @@ def list_users():
 
     if emails:
         filters['email'] = emails
-    
+
     if is_admin is not None:
         if is_admin == 'true':
             filters['is_admin'] = True
         elif is_admin == 'false':
             filters['is_admin'] = False
-            
+
     users_list = db_api.list_users(filters)
 
     return utils.make_json_response(200, users_list)
@@ -96,7 +94,7 @@ def list_adapters():
 
 @v1_app.route('/adapters/<int:adapter_id>/config-schema', methods=['GET'])
 def get_adapter_config_schema(adapter_id):
-    os_id = request.args.get('os-id')
+    # os_id = request.args.get('os-id')
     schema=None
     try:
         schema = db_api.get_adapter(adapter_id)
