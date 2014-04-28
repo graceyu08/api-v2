@@ -50,15 +50,43 @@ class TimestampMixin(object):
     updated_at = Column(DateTime, onupdate=lambda: datetime.now())
 
 
+class MetadataMixin(object):
+    #id = Column(Integer, primary_key=True)
+    name =  Column(String(80), unique=True)
+    description = Column(String(200))
+
+
+class MetadataFieldMixin(object):
+    #id = Column(Integer, primary_key=True)
+    field = Column(String(80), unique=True)
+    ftype = Column(Enum('str', 'int', 'float', 'list', 'dict', 'bool'))
+    validator = Column(String(80))
+    is_required = Column(Boolean, default=True)
+    description = Column(String(200))
+
+
 class HelperMixin(object):
     def to_dict(self):
+        return self._to_dict()
+
+    def _to_dict(self, extra_dict=None):
         dict_info = self.__dict__.copy()
         columns = ['created_at', 'updated_at', 'last_login_at']
         for key in columns:
             if key in dict_info:
                 dict_info[key] = dict_info[key].ctime()
         dict_info.pop('_sa_instance_state')
+        if extra_dict:
+            dict_info.update(extra_dict)
+
         return dict_info
+
+
+# User, Permission relation table
+user_permission = Table('user_permission', BASE.metadata,
+    Column('user_id', Integer, ForeignKey('user.id')),
+    Column('permission_id', Integer, ForeignKey('permission.id'))
+)
 
 
 class User(BASE, UserMixin, HelperMixin):
@@ -74,6 +102,7 @@ class User(BASE, UserMixin, HelperMixin):
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now())
     last_login_at = Column(DateTime, default=lambda: datetime.now())
+    permissions = relationship("Permission", secondary=user_permission)
 
     def __init__(self, email, password, **kwargs):
         self.email = email
@@ -109,13 +138,143 @@ class Permission(BASE):
     name = Column(String(80), unique=True)
     alias = Column(String(100))
 
-    def __init__(self, name, alias=None):
+    def __init__(self, name, alias):
         self.name = name
-        if alias:
-            self.alias = alias
+        self.alias = alias
 
 
-user_permission = Table('user_permission', BASE.metadata,
-    Column('user_id', Integer, ForeignKey('user.id')),
-    Column('permission_id', Integer, ForeignKey('permission.id'))
+adapter_os = Table('adapter_os', BASE.metadata,
+    Column('adapter_id', Integer, ForeignKey('adapter.id')),
+    Column('os_id', Integer, ForeignKey('os.id'))
 )
+
+
+class OperatingSystem(BASE):
+    """OS table"""
+    __tablename__ = 'os'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(80), unique=True)
+
+
+class Adapter(BASE, HelperMixin):
+    """Adapter table"""
+    __tablename__ = "adapter"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(80), unique=True)
+
+    roles = relationship("AdapterRole")
+    support_os = relationship("OperatingSystem", secondary=adapter_os)
+    #package_config = xxxx
+
+
+class AdapterRole(BASE):
+    """Adapter's roles"""
+    __tablename__ = "adapter_role"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(80))
+    adapter_id = Column(Integer, ForeignKey('adapter.id'))
+
+'''
+adapter_config_metatdata_field = Table('adapter_config_metadata_field',
+    BASE.metadata,
+    Column('adapter_config_metadata_id',
+           Integer,
+           ForeignKey('adapter_config_metadata.id')
+    ),
+    Column('adapter_config_field_id',
+           Integer,
+           ForeignKey('adapter_config_field.id')
+    )
+)
+
+
+class AdapterConfigMetadata(BASE):
+    """Adapter config metadata"""
+    __tablename__ = "adapter_config_metadata"
+
+    id = Column(Integer, primary_key=True)
+    name =  Column(String(80), unique=True)
+    description = Column(String(200))
+    parent_id = Column(Integer, ForeignKey(id))
+    adapter_id = Column(Integer, ForeignKey('adapter.id'))
+    children = relationship("AdapterConfigMetadata",
+                            backref=backref('parent' ,remote_side=id))
+    #fields = relationship("AdapterConfigField",
+    #                      secondary=adapter_config_metatdata_field)
+
+    def get_config_format(self, adapter_id, entry_elem):
+        pass
+
+
+class AdapterConfigField(BASE, MetadataFieldMixin):
+    """Adapter cofig metadata fields"""
+    __tablename__ = "adapter_config_field"
+
+'''
+
+os_config_metadata_field = Table('os_config_metadata_field', BASE.metadata,
+    Column('os_config_metadata_id',
+           Integer, ForeignKey('os_config_metadata.id')),
+    Column('os_config_field_id',
+           Integer, ForeignKey('os_config_field.id'))
+)
+
+'''
+ext_os_config_metadata_field = Table('ext_os_config_metadata_field',
+    BASE.metadata,
+    Column('ext_os_metadata_id',
+           Integer, ForeignKey('os_config_metadata.id')),
+    Column('ext_os_metadata_field_id',
+           Integer, ForeignKey('os_config_field.id'))
+)
+
+'''
+class OSConfigMetadata(BASE, MetadataMixin):
+    """OS config metadata"""
+    __tablename__ = "os_config_metadata"
+    
+    id = Column(Integer, primary_key=True)
+    os_id =  Column(Integer, ForeignKey('os.id'))
+    #parent_id = Column(Integer, ForeignKey('os_config_metadata.id'))
+    parent_id = Column(Integer, ForeignKey(id))
+    children = relationship("OSConfigMetadata",
+                            backref=backref("parent", remote_side=id))
+    fields = relationship('OSConfigField',
+                          secondary=os_config_metadata_field)
+
+    def __init__(self, name, os_id, parent=None):
+        self.name = name
+        self.os_id = os_id
+        self.parent = parent
+
+
+class OSConfigField(BASE, MetadataFieldMixin):
+    """OS config metadata fields"""
+    __tablename__ = 'os_config_field'
+    id = Column(Integer, primary_key=True)
+
+
+class Cluster(BASE, TimestampMixin, HelperMixin):
+    """Cluster table"""
+    __tablename__ = "cluster"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(80), unique=True)
+    editable = Column(Boolean, default=True)
+    os_global_config = Column(JSONEncodedDict)
+    package_global_config = Column(JSONEncodedDict)
+    adapter_id = Column(Integer, ForeignKey('adapter.id'))
+    os_id = Column(Integer, ForeignKey('os.id'))
+    created_by = Column(Integer, ForeignKey('user.id'))
+
+    owner = relationship('User')
+    # hosts = relationship('Host', secondary=cluster_host)
+
+    def to_dict(self):
+        extra_info = {
+            'created_by': self.owner.email,
+            'hosts': []
+        }
+        return self._to_dict(extra_info)
