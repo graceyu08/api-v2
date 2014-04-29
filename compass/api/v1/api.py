@@ -30,6 +30,28 @@ v1_app = Blueprint('v1_app', __name__)
 api = Api(v1_app)
 PREFIX = '/v1.0'
 
+
+@v1_app.route('/users', methods=['GET'])
+def list_users():
+    emails = request.args.getlist('email')
+    is_admin = request.args.get('admin')
+
+    filters = {}
+
+    if emails:
+        filters['email'] = emails
+
+    if is_admin is not None:
+        if is_admin == 'true':
+            filters['is_admin'] = True
+        elif is_admin == 'false':
+            filters['is_admin'] = False
+
+    users_list = db_api.list_users(filters)
+
+    return utils.make_json_response(200, users_list)
+
+
 class User(Resource):
     ENDPOINT = PREFIX + '/users'
 
@@ -45,10 +67,77 @@ class User(Resource):
                 exception.ItemNotFound(error_msg)
             )
 
-        return utils.make_json_response(200, {user_data})
+        return utils.make_json_response(200, user_data)
 
-api.add_resource(User, '/users/<int:user_id>')
+    def post(self):
+        """Create a new user"""
+        pass
 
+    def put(self, user_id):
+        """Update user information(firstname, lastname)"""
+        pass
+
+    def delete(self, user_id):
+        """Delete a user"""
+        pass
+
+@v1_app.route('/adapters', methods=['GET'])
+def list_adapters():
+    names = request.args.getlist('name')
+    filters = {}
+    if names:
+        filters['name'] = names
+
+    adapters_list = db_api.list_adapters(filters)
+    return utils.make_json_response(200, adapters_list)
+
+
+@v1_app.route('/adapters/<int:adapter_id>/os/<int:os_id>/config-schema',
+              methods=['GET'])
+def get_adapter_config_schema(adapter_id, os_id):
+
+    try:
+        schema = db_api.get_adapter_config_schema(adapter_id, os_id)
+    except RecordNotExists as ex:
+        return exception.handle_not_exist(
+            exception.ItemNotFound(ex.message)
+        )
+
+    return utils.make_json_response(200, schema)
+
+
+@v1_app.route('/adapters/<int:adapter_id>/roles', methods=['GET'])
+def get_adapter_roles(adapter_id):
+    try:
+        roles = db_api.get_adapter(adapter_id, True)
+    except RecordNotExists as ex:
+        return exception.handle_not_exist(
+            exception.ItemNotFound(ex.message)
+        )
+
+    return utils.make_json_response(200, roles)
+
+
+class Adapter(Resource):
+    ENDPOINT = PREFIX + "/adapters"
+
+    def get(self, adapter_id):
+        try:
+            adapter_info = db_api.get_adapter(adapter_id)
+            print adapter_info
+        except RecordNotExists as ex:
+            error_msg = ex.message
+            return exception.handle_not_exist(
+                exception.ItemNotFound(error_msg)
+            )
+        return utils.make_json_response(200, adapter_info)
+
+api.add_resource(User,
+                 '/users',
+                 '/users/<int:user_id>')
+api.add_resource(Adapter,
+                 '/adapters',
+                 '/adapters/<int:adapter_id>')
 
 if __name__ == '__main__':
     v1_app.run(debug=True)

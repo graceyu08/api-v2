@@ -1,24 +1,94 @@
-from compass.db.exception import *
-
-from compass.db.models import User
 from compass.db.api import database
 from compass.db.api import utils
+from compass.db.api.utils import wrap_to_dict
+from compass.db.exception import *
+from compass.db.models import User
 
-SUPPORT_FILTERS = ['email', 'admin']
-DEFAULT_RESP_FIELDS = ['id', 'email', 'is_admin', 'active', 'firstname',
+
+SUPPORTED_FILTERS = ['email', 'admin']
+UPDATED_FIELDS = ['firstname', 'lastname', 'password']
+RESP_FIELDS = ['id', 'email', 'is_admin', 'active', 'firstname',
                        'lastname', 'created_at', 'last_login_at']
 USER = 'user'
 USERS = 'users'
 
+ERROR_MSG = {
+    'findNoUser': 'Cannot find the user, ID is %d',
+    'duplicatedUser': 'User already exists!',
+    'forbidden': 'User has no permission to make this request.'
+}
 
+
+@wrap_to_dict(RESP_FIELDS)
 def get_user(user_id):
     with database.session() as session:
        user = _get_user(session, user_id)
        if not user:
-           raise RecordNotExists(USER, user_id)
+           err_msg = ERROR_MSG['findNoUser'] % user_id
+           raise RecordNotExists(err_msg)
 
-       user = utils.wrapper_dict(user.to_dict(), DEFAULT_RESP_FIELDS)
-    return user
+       user_info = user.to_dict()
+
+    return user_info
+
+
+@wrap_to_dict(RESP_FIELDS)
+def list_users(filters=None):
+    """List all users, optionally filtered by some fields"""
+    if filters:
+        filters = utils.get_legal_filters(USER, filters)
+
+    with database.session() as session:
+        users = _list_users(session, filters)
+        users_list = [user.to_dict() for user in users]
+            
+    return users_list
+
+
+@wrap_to_dict
+def add_user(created_by, email, password, firstname=None, lastname=None):
+    """Create a user"""
+    REQUIRED_PERM = 'create_user'
+
+    with database.session() as session:
+        user = _get_user(session, created_by)
+        if not user:
+            err_msg = ERROR_MSG['findNoUser'] % created_by
+            raise RecordNotExists(err_msg)
+
+        if not user.is_admin or REQUIRED_PERM not in user.permissions:
+            # The user is not allowed to create a user.
+            err_msg = ERROR_MSG['forbidden']
+            raise Forbidden(err_msg)
+
+        if session.query(User).filter_by(email=email).first():
+            # The user already exists!
+            err_msg = ERROR_MSG['duplicatedUser']
+            raise DuplicatedRecord(err_msg)
+
+        new_user = _add_user(email, password, firstname, lastname)
+        new_user_info = new_user.to_dict()
+
+    return new_user_info
+
+
+def update_user(user_id, **kwargs):
+    """Update a user"""
+    with database.session() as session:
+        user = _get_user(session, user_id)
+        if not user:
+            err_msg = ERROR_MSG['findNoUser'] % user_id
+            raise RecordNotExists(err_msg)
+
+        update_info = {}
+        for key in kwargs:
+            if key in UPDATED_FIELDS:
+                update_info[key] = kwargs[key]
+
+        user = _update_user(**update_info)
+        user_info = user.to_dict()
+
+    return user_info
 
 
 def _get_user(session, user_id):
@@ -31,17 +101,40 @@ def _get_user(session, user_id):
 
 def _list_users(session, filters=None):
     """Get all users, optionally filtered by some fields"""
-    pass
+
+    filters = filters if filters else {}
+
+    with session.begin(subtransactions=True):
+        query = session.query(User)
+        if filters:
+            for key in filters:
+                if isinstance(filters[key], list):
+                    query = query.filter(getattr(User, key).in_(filters[key]))
+                else:
+                    query = query.filter(getattr(User, key) == filters[key])
+
+        users = query.all()
+
+    return users
 
 
-def _add_user(session, **kwargs):
+def _add_user(session, email, password, firstname=None, lastname=None):
     """Create a user"""
-    pass
+    with session.begin(subtransactions=True):
+        user = User(email=email, password=password,
+                    firstname=firstname, lastname=lastname)
+        session.add(user)
+
+    return user
 
 
 def _update_user(session, user_id, **kwargs):
     """Update user information"""
-    pass
+    with session.begin(subtransactions=True):
+        session.query(User).filter_by(id=user_id).update(kwargs)
+        user = _get_user(session, user_id)
+
+    return user
 
 
 def _add_permission(session, user_id, permissions):
