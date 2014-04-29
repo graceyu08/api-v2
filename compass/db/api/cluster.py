@@ -104,14 +104,16 @@ def update_cluster_config(cluster_id, config, is_os_config=True, patch=True):
        if not is_valid:
           raise InvalidParameter(message)
 
+       
        # For addtional validation, you can define functions in extension,
-       # for example:
+       # for example: 
        # os_name = get_os(cluster.os_id)['name']
        # if getattr(extension, os_name):
        #    func = getattr(getattr(extension, os_name), 'validate_config')
        #    if not func(session, os_id, config, patch):
        #        return False
 
+       
        if is_os_config:
            os_config = cluster.os_global_config
            utils.merge_dict(os_config, config)
