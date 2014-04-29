@@ -31,7 +31,7 @@ DEFAULT_PERMS = [
 ADAPTERS = ['openstack', 'ceph', 'centos', 'ubuntu']
 
 # OS
-OS = ['CentOs', 'Ubuntu']
+OS = ['CentOS', 'Ubuntu']
 
 # adapter_os (adater_id, os_id)
 ADAPTER_OS_DEF = {

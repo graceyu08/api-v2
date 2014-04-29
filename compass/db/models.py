@@ -272,11 +272,11 @@ class Cluster(BASE, TimestampMixin, HelperMixin):
     owner = relationship('User')
     # hosts = relationship('Host', secondary=cluster_host)
 
-    def __init__(self, name, adapter_id, os_id, user_id):
+    def __init__(self, name, adapter_id, os_id, created_by):
         self.name = name
         self.adapter_id = adapter_id
         self.os_id = os_id
-        self.created_by = user_id
+        self.created_by = created_by
 
     @property
     def config(self):
