@@ -46,7 +46,8 @@ class JSONEncodedDict(TypeDecorator):
 
 class TimestampMixin(object):
     created_at = Column(DateTime, default=lambda: datetime.now())
-    updated_at = Column(DateTime, onupdate=lambda: datetime.now())
+    updated_at = Column(DateTime, default=lambda: datetime.now(),
+                                  onupdate=lambda: datetime.now())
 
 
 class MetadataMixin(object):
@@ -285,6 +286,7 @@ class Cluster(BASE, TimestampMixin, HelperMixin):
         config.update(self.package_global_config)
 
         return config
+
 
     def to_dict(self):
         extra_info = {

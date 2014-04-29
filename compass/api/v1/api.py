@@ -14,6 +14,7 @@
 
 """Define all the RestfulAPI entry points."""
 import logging
+import simplejson as json
 
 from flask import Blueprint
 from flask import request
@@ -21,10 +22,13 @@ from flask import request
 from flask.ext.restful import Api
 from flask.ext.restful import Resource
 
-from compass.api import exception
+from compass.api.exception import *
 from compass.api import utils
+
 from compass.db import db_api
 from compass.db.exception import RecordNotExists
+from compass.db.exception import InvalidParameter
+
 
 v1_app = Blueprint('v1_app', __name__)
 api = Api(v1_app)
@@ -63,8 +67,8 @@ class User(Resource):
 
         except RecordNotExists as ex:
             error_msg = ex.message
-            return exception.handle_not_exist(
-                exception.ItemNotFound(error_msg)
+            return handle_not_exist(
+                ItemNotFound(error_msg)
             )
 
         return utils.make_json_response(200, user_data)
@@ -99,8 +103,8 @@ def get_adapter_config_schema(adapter_id, os_id):
     try:
         schema = db_api.get_adapter_config_schema(adapter_id, os_id)
     except RecordNotExists as ex:
-        return exception.handle_not_exist(
-            exception.ItemNotFound(ex.message)
+        return handle_not_exist(
+            ItemNotFound(ex.message)
         )
 
     return utils.make_json_response(200, schema)
@@ -111,8 +115,8 @@ def get_adapter_roles(adapter_id):
     try:
         roles = db_api.get_adapter(adapter_id, True)
     except RecordNotExists as ex:
-        return exception.handle_not_exist(
-            exception.ItemNotFound(ex.message)
+        return handle_not_exist(
+            ItemNotFound(ex.message)
         )
 
     return utils.make_json_response(200, roles)
@@ -127,10 +131,48 @@ class Adapter(Resource):
             print adapter_info
         except RecordNotExists as ex:
             error_msg = ex.message
-            return exception.handle_not_exist(
-                exception.ItemNotFound(error_msg)
+            return handle_not_exist(
+                ItemNotFound(error_msg)
             )
         return utils.make_json_response(200, adapter_info)
+
+
+class Cluster(Resource):
+    def get(self, cluster_id):
+        try:
+            cluster_info = db_api.get_cluster(cluster_id)
+
+        except RecordNotExists as ex:
+            error_msg = ex.message
+            return handle_not_exist(
+                ItemNotFound(error_msg)
+            )
+        return utils.make_json_response(200, cluster_info)
+
+
+@v1_app.route('/clusters/<int:cluster_id>/config', methods=['PUT', 'PATCH'])
+def add_cluster_config(cluster_id):
+        config = json.loads(request.data)
+        if not config:
+            return handle_bad_request(
+                BadRequest("Config cannot be None!")
+            )
+
+        result = None
+        try:
+            if "os_config" in config:
+                result = db_api.update_cluster_config(cluster_id, config,
+                                                      patch=request.method=='PATCH')
+            elif "package_config" in config:
+                result = db_api.update_cluster_config(cluster_id, config,
+                                                      is_os_config=False,
+                                                      patch=request.method=='PATCH')
+        except InvalidParameter as ex:
+            return handle_bad_request(
+                BadRequest(ex.message)
+            )
+        return utils.make_json_response(200, result)
+
 
 api.add_resource(User,
                  '/users',
@@ -138,6 +180,61 @@ api.add_resource(User,
 api.add_resource(Adapter,
                  '/adapters',
                  '/adapters/<int:adapter_id>')
+api.add_resource(Cluster,
+                 '/clusters',
+                 '/clusters/<int:cluster_id>')
+
+
+@v1_app.errorhandler(ItemNotFound)
+def handle_not_exist(error, failed_objs=None):
+    """Handler of ItemNotFound Exception."""
+
+    message = {'type': 'itemNotFound',
+               'message': error.message}
+
+    if failed_objs and isinstance(failed_objs, dict):
+        message.update(failed_objs)
+
+    return utils.make_json_response(404, message)
+
+
+@v1_app.errorhandler(Unauthorized)
+def handle_invalid_user(error, failed_objs=None):
+    """Handler of Unauthorized Exception."""
+
+    message = {'type': 'unathorized',
+               'message': error.message}
+
+    if failed_objs and isinstance(failed_objs, dict):
+        message.update(failed_objs)
+
+    return utils.make_json_response(401, message)
+
+@v1_app.errorhandler(Forbidden)
+def handle_no_permission(error, failed_objs=None):
+    """Handler of Forbidden Exception."""
+
+    message = {'type': 'Forbidden',
+               'message': error.message}
+
+    if failed_objs and isinstance(failed_objs, dict):
+        message.update(failed_objs)
+
+    return utils.make_json_response(403, message)
+
+
+@v1_app.errorhandler(BadRequest)
+def handle_bad_request(error, failed_objs=None):
+    """Handler of badRequest Exception."""
+
+    message = {'type': 'badRequest',
+               'message': error.message}
+
+    if failed_objs and isinstance(failed_objs, dict):
+        message.update(failed_objs)
+
+    return utils.make_json_response(400, message)
+
 
 if __name__ == '__main__':
     v1_app.run(debug=True)

@@ -3,12 +3,11 @@ from compass.db.api import utils
 from compass.db.api.utils import wrap_to_dict
 from compass.db.exception import *
 
-from compass.db import validator
+from compass.db import utils
+from compass.db.config_validation import validate_config
+#from compass.db.config_validation import extension
 
 from compass.db.models import Cluster
-from compass.db.models import OSConfigMetadata
-#from compass.db.models import AdapterConfigMetadata
-
 
 SUPPORTED_FILTERS = ['name', 'adapter', 'owner']
 
@@ -26,7 +25,7 @@ def get_cluster(cluster_id):
            err_msg = ERROR_MSG['findNoCluster'] % cluster_id
            raise RecordNotExists(err_msg)
 
-       info = adapter.to_dict()
+       info = cluster.to_dict()
 
     return info
 
@@ -51,8 +50,8 @@ def get_cluster_config(cluster_id):
     with database.session() as session:
         try:
             config = _get_cluster_config(session, cluster_id)
-        except RecordNotExists:
-            raise RecordNotExists
+        except RecordNotExists as ex:
+            raise RecordNotExists(ex.message)
 
     return config
 
@@ -96,5 +95,30 @@ def _list_clusters(session, filters=None):
     return clusters
 
 
-def update_cluster_config(cluster_id, config, patch=True):
-    pass
+def update_cluster_config(cluster_id, config, is_os_config=True, patch=True):
+    with database.session() as session:
+       cluster = _get_cluster(session, cluster_id)
+
+       is_valid, message = validate_config(session, cluster.adapter_id,
+                                           cluster.os_id, config, patch)
+       if not is_valid:
+          raise InvalidParameter(message)
+       
+       # For addtional validation, you can define functions in extension,
+       # for example: 
+       # os_name = get_os(cluster.os_id)['name']
+       # if getattr(extension, os_name):
+       #    func = getattr(getattr(extension, os_name), 'validate_config')
+       #    if not func(session, os_id, config, patch):
+       #        return False
+       
+       if is_os_config:
+           os_config = cluster.os_global_config
+           utils.merge_dict(os_config, config)
+           cluster.os_global_config = config
+           return os_config
+       else:
+           package_config = cluster.package_global_config
+           utils.merge_dict(package_config, config)
+           cluster.package_global_config = package_config
+           return package_config

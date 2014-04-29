@@ -20,3 +20,10 @@ class Forbidden(Exception):
     def __init__(self, message):
         super(Forbidden, self).__init__(message)
         self.message = message
+
+class InvalidParameter(Exception):
+    """Define the exception that the request has invalid or missing parameters
+    """
+    def __init__(self, message):
+        super(InvalidParameter, self).__init__(message)
+        self.message = message
