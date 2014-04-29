@@ -3,7 +3,8 @@ import logging
 
 SUPPORTED_FILTERS = {
     "user": ['email', 'is_admin'],
-    "adapter": ['name']
+    "adapter": ['name'],
+    "cluster": ['name',"adapter", "created_by"]
 }
 
 

@@ -11,7 +11,6 @@ from sqlalchemy import Float, Enum, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.types import TypeDecorator
 
 
@@ -51,13 +50,11 @@ class TimestampMixin(object):
 
 
 class MetadataMixin(object):
-    #id = Column(Integer, primary_key=True)
     name =  Column(String(80), unique=True)
     description = Column(String(200))
 
 
 class MetadataFieldMixin(object):
-    #id = Column(Integer, primary_key=True)
     field = Column(String(80), unique=True)
     ftype = Column(Enum('str', 'int', 'float', 'list', 'dict', 'bool'))
     validator = Column(String(80))
@@ -67,14 +64,15 @@ class MetadataFieldMixin(object):
 
 class HelperMixin(object):
     def to_dict(self):
-        return self._to_dict()
-
-    def _to_dict(self, extra_dict=None):
         dict_info = self.__dict__.copy()
+        return self._to_dict(dict_info)
+
+    def _to_dict(self, dict_info, extra_dict=None):
         columns = ['created_at', 'updated_at', 'last_login_at']
         for key in columns:
             if key in dict_info:
                 dict_info[key] = dict_info[key].ctime()
+
         dict_info.pop('_sa_instance_state')
         if extra_dict:
             dict_info.update(extra_dict)
@@ -168,6 +166,19 @@ class Adapter(BASE, HelperMixin):
     support_os = relationship("OperatingSystem", secondary=adapter_os)
     #package_config = xxxx
 
+    def to_dict(self):
+        oses = []
+        for os in self.support_os:
+            oses.append({"name": os.name, "os_id": os.id})
+
+        extra_dict = {
+            "compatible_os": oses
+        }
+        dict_info = self.__dict__.copy()
+        del dict_info['support_os']
+
+        return self._to_dict(dict_info, extra_dict)
+
 
 class AdapterRole(BASE):
     """Adapter's roles"""
@@ -221,23 +232,12 @@ os_config_metadata_field = Table('os_config_metadata_field', BASE.metadata,
            Integer, ForeignKey('os_config_field.id'))
 )
 
-'''
-ext_os_config_metadata_field = Table('ext_os_config_metadata_field',
-    BASE.metadata,
-    Column('ext_os_metadata_id',
-           Integer, ForeignKey('os_config_metadata.id')),
-    Column('ext_os_metadata_field_id',
-           Integer, ForeignKey('os_config_field.id'))
-)
-
-'''
 class OSConfigMetadata(BASE, MetadataMixin):
     """OS config metadata"""
     __tablename__ = "os_config_metadata"
 
     id = Column(Integer, primary_key=True)
     os_id =  Column(Integer, ForeignKey('os.id'))
-    #parent_id = Column(Integer, ForeignKey('os_config_metadata.id'))
     parent_id = Column(Integer, ForeignKey(id))
     children = relationship("OSConfigMetadata",
                             backref=backref("parent", remote_side=id))
@@ -250,7 +250,7 @@ class OSConfigMetadata(BASE, MetadataMixin):
         self.parent = parent
 
 
-class OSConfigField(BASE, MetadataFieldMixin):
+class OSConfigField(BASE, MetadataFieldMixin, HelperMixin):
     """OS config metadata fields"""
     __tablename__ = 'os_config_field'
     id = Column(Integer, primary_key=True)
@@ -272,9 +272,26 @@ class Cluster(BASE, TimestampMixin, HelperMixin):
     owner = relationship('User')
     # hosts = relationship('Host', secondary=cluster_host)
 
+    def __init__(self, name, adapter_id, os_id, user_id):
+        self.name = name
+        self.adapter_id = adapter_id
+        self.os_id = os_id
+        self.created_by = user_id
+
+    @property
+    def config(self):
+        config = {}
+        config.update(self.os_global_config)
+        config.update(self.package_global_config)
+
+        return config
+
     def to_dict(self):
         extra_info = {
             'created_by': self.owner.email,
             'hosts': []
         }
-        return self._to_dict(extra_info)
+        dict_info = self.__dict__.copy()
+        del dict_info['owner']
+
+        return self._to_dict(dict_info, extra_info)

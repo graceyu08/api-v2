@@ -41,13 +41,23 @@ ADAPTER_OS_DEF = {
     4: [2]
 }
 
+# adapter roles
+ROLES = [
+    {"name": "compute", "adapter_id": 1},
+    {"name": "controller", "adapter_id": 1},
+    {"name": "metering", "adapter_id": 1},
+    {"name": "network", "adapter_id": 1},
+    {"name": "storage", "adapter_id": 1}
+]
+
 # OS config metatdata
 OS_CONFIG_META_DEF = [
         {"name": "os_config", "p_id": None, 'os_id': None},
         {"name": "general", "p_id": 1, 'os_id': None},
         {"name": "network", "p_id": 1, 'os_id': None},
         {"name": "$interface", "p_id": 3, 'os_id': None},
-        {"name": "ext_example_meta", "p_id": 1, 'os_id': 2}
+        {"name": "ext_example_meta", "p_id": 1, 'os_id': 2},
+        {"name": "server_credentilas", "p_id": 1, 'os_id': None}
 ]
 # OS config field
 OS_CONFIG_FIELD_DEF = [
@@ -56,15 +66,27 @@ OS_CONFIG_FIELD_DEF = [
     {"name": "ip", "validator": 'is_valid_ip', 'is_required': True, 'ftype': 'str'},
     {"name": "netmask", "validator": 'is_valid_netmask', 'is_required': True, 'ftype': 'str'},
     {"name": "gateway", "validator": 'is_valid_gateway', 'is_required': True, 'ftype': 'str'},
-    {"name": "ext_example_field", "validator": None, 'is_required': True, 'ftype': 'str'}
+    {"name": "ext_example_field", "validator": None, 'is_required': True, 'ftype': 'str'},
+    {"name": "username", "validator": None, 'is_required': True, 'ftype': 'str'},
+    {"name": "password", "validator": None, 'is_required': True, 'ftype': 'str'}
 ]
 
 # OS config metadata field (metadata_id, field_id)
-COMMON_OS_CONFIG_META_FIELD_DEF = {
+OS_CONFIG_META_FIELD_DEF = {
     2: [1, 2],
     4: [3, 4, 5],
-    5: [6]
+    5: [6],
+    6: [7, 8]
 }
+
+# Cluster: Demo purpose
+CLUSTER = {
+    "name": "demo",
+    "adapter_id": 1,
+    "os_id": 2,
+    "created_by": 1
+}
+
 
 def init(database_url):
     """Initialize database.
@@ -130,12 +152,14 @@ def current_session():
 
 def create_db():
     """Create database."""
-    models.BASE.metadata.create_all(bind=ENGINE)
+    try:
+        models.BASE.metadata.create_all(bind=ENGINE)
+    except Exception as e:
+        print e
     with session() as _session:
         # Initialize default user
         user = models.User(email='admin@abc.com',
-                           password='admin')#,is_admin=True)
-        logging.info('Init user: %s, %s' % (user.email, user.get_password()))
+                           password='admin', is_admin=True)
         _session.add(user)
         print "Checking .....\n"
         # Initialize default permissions
@@ -149,8 +173,15 @@ def create_db():
         adapters = []
         for name in ADAPTERS:
             adapters.append(models.Adapter(name=name))
-        _session.add_all(adapters)
 
+        _session.add_all(adapters)
+        
+        # Populate adapter roles
+        roles = []
+        for entry in ROLES:
+            roles.append(models.AdapterRole(**entry))
+        _session.add_all(roles)
+        
 
         # Populate os table
         oses = []
@@ -190,12 +221,16 @@ def create_db():
         _session.add_all(os_fields)
 
 
-        # Populate common OS config metatdata field
-        for meta_id in COMMON_OS_CONFIG_META_FIELD_DEF:
+        # Populate OS config metatdata field
+        for meta_id in OS_CONFIG_META_FIELD_DEF:
             meta = os_meta[meta_id-1]
-            for field_id in COMMON_OS_CONFIG_META_FIELD_DEF[meta_id]:
+            for field_id in OS_CONFIG_META_FIELD_DEF[meta_id]:
                 field = os_fields[field_id-1]
                 meta.fields.append(field)
+
+        # Populate one cluster -- DEMO PURPOSE
+        cluster = models.Cluster(**CLUSTER)
+        _session.add(cluster)
 
 def drop_db():
     """Drop database."""

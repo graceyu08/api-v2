@@ -92,16 +92,30 @@ def list_adapters():
     return utils.make_json_response(200, adapters_list)
 
 
-@v1_app.route('/adapters/<int:adapter_id>/config-schema', methods=['GET'])
-def get_adapter_config_schema(adapter_id):
-    # os_id = request.args.get('os-id')
-    schema=None
+@v1_app.route('/adapters/<int:adapter_id>/os/<int:os_id>/config-schema',
+              methods=['GET'])
+def get_adapter_config_schema(adapter_id, os_id):
+
     try:
-        schema = db_api.get_adapter(adapter_id)
-    except Exception as e:
-        print e
+        schema = db_api.get_adapter_config_schema(adapter_id, os_id)
+    except RecordNotExists as ex:
+        return exception.handle_not_exist(
+            exception.ItemNotFound(ex.message)
+        )
 
     return utils.make_json_response(200, schema)
+
+
+@v1_app.route('/adapters/<int:adapter_id>/roles', methods=['GET'])
+def get_adapter_roles(adapter_id):
+    try:
+        roles = db_api.get_adapter(adapter_id, True)
+    except RecordNotExists as ex:
+        return exception.handle_not_exist(
+            exception.ItemNotFound(ex.message)
+        )
+
+    return utils.make_json_response(200, roles)
 
 
 class Adapter(Resource):
@@ -110,6 +124,7 @@ class Adapter(Resource):
     def get(self, adapter_id):
         try:
             adapter_info = db_api.get_adapter(adapter_id)
+            print adapter_info
         except RecordNotExists as ex:
             error_msg = ex.message
             return exception.handle_not_exist(
