@@ -31,16 +31,15 @@ def get_adapter(adapter_id, return_roles=False):
        if return_roles:
            roles = adapter.roles
            info = [role.name for role in roles]
-           
-       else:
-           info = adapter.to_dict()
 
     return info
 
 
 @wrap_to_dict()
-def get_adapter_config_schema(adapter_id, os_id,
-                              os_config_only=False, package_config_only=False):
+def get_adapter_config_schema(adapter_id,
+                              os_id,
+                              os_config_only=False,
+                              package_config_only=False):
     schema = {}
     with database.session() as session:
         adapter = _get_adapter(session, adapter_id)
@@ -48,15 +47,31 @@ def get_adapter_config_schema(adapter_id, os_id,
             err_msg = ERROR_MSG['findNoAdapter'] % adapter_id
             raise RecordNotExists(err_msg)
 
+        # TODO(Grace): This function signature has a flaw (in theory).
+        # os_config_only and package_config_only is not of equal importance.
+        # For example, it is not easy to define a behavior if
+        # os_config_only=True, and package_config_only=True
+        # With your current implementation, this case is allowed and
+        # only os_config_only takes effect.
+
+        # An alternative implementation with simplier logic, but different
+        # behavior if both args are set to true.
+        """
+           if not os_config_only:
+             schema.update(_get_adapter_package_config_schema(session, adapter_id))
+
+           if not package_config_only:
+             schema.update(_get_adapter_os_config_schema(session, os_id))
+        """
         if os_config_only:
             schema.update(_get_adapter_os_config_schema(session, os_id))
         elif package_config_only:
             pass
-            #schema.update(_get_adapter_package_config_schema(session, adapter_id))
+            schema.update(_get_adapter_package_config_schema(session, adapter_id))
         else:
             schema.update(_get_adapter_os_config_schema(session, os_id))
-            #schema.update(_get_adapter_package_config_schema(session, adapter_id))
-    
+            schema.update(_get_adapter_package_config_schema(session, adapter_id))
+
     return schema
 
 
@@ -84,10 +99,14 @@ def _get_adapter(session, adapter_id):
 def _list_adapters(session, filters=None):
     """Get all adapters, optionally filtered by some fields"""
 
+    # TODO(Grace): Simplier if using this:
+    # filters = filters or {}
     filters = filters if filters else {}
 
     with session.begin(subtransactions=True):
         query = session.query(Adapter)
+        # TODO(Grace): There is no need to have if- here.
+        # simply do for-loop. It is no-op if filters is empty
         if filters:
             for key in filters:
                 if isinstance(filters[key], list):
@@ -101,7 +120,7 @@ def _list_adapters(session, filters=None):
 
 
 def _get_adapter_package_config_schema(session):
-    pass
+    return {}
 
 
 # TODO(Grace): TMP method
