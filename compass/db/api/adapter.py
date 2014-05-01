@@ -26,7 +26,7 @@ def get_adapter(adapter_id, return_roles=False):
        if not adapter:
            err_msg = ERROR_MSG['findNoAdapter'] % adapter_id
            raise RecordNotExists(err_msg)
-       info = None
+       info = adapter.to_dict()
 
        if return_roles:
            roles = adapter.roles
@@ -67,10 +67,10 @@ def get_adapter_config_schema(adapter_id,
             schema.update(_get_adapter_os_config_schema(session, os_id))
         elif package_config_only:
             pass
-            schema.update(_get_adapter_package_config_schema(session, adapter_id))
+            #schema.update(_get_adapter_package_config_schema(session, adapter_id))
         else:
             schema.update(_get_adapter_os_config_schema(session, os_id))
-            schema.update(_get_adapter_package_config_schema(session, adapter_id))
+            #schema.update(_get_adapter_package_config_schema(session, adapter_id))
 
     return schema
 
@@ -119,7 +119,7 @@ def _list_adapters(session, filters=None):
     return adapters
 
 
-def _get_adapter_package_config_schema(session):
+def _get_adapter_package_config_schema(session, adapter_id):
     return {}
 
 
