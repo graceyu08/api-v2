@@ -1,3 +1,5 @@
+import simplejson as json
+
 from compass.db.api import database
 from compass.db.api import utils
 from compass.db.api.utils import wrap_to_dict
@@ -96,6 +98,7 @@ def _list_clusters(session, filters=None):
 
 
 def update_cluster_config(cluster_id, config, is_os_config=True, patch=True):
+    result = None
     with database.session() as session:
        cluster = _get_cluster(session, cluster_id)
 
@@ -116,11 +119,15 @@ def update_cluster_config(cluster_id, config, is_os_config=True, patch=True):
        
        if is_os_config:
            os_config = cluster.os_global_config
-           utils.merge_dict(os_config, config)
-           cluster.os_global_config = config
-           return os_config
+           os_config = json.loads(json.dumps(os_config))
+           utils.merge_dict(os_config, config)        
+           cluster.os_global_config = os_config
+           result = cluster.os_global_config
        else:
            package_config = cluster.package_global_config
+           package_config = json.loads(json.dumps(package_config))
            utils.merge_dict(package_config, config)
            cluster.package_global_config = package_config
-           return package_config
+           result =  cluster.package_global_config
+
+    return result        

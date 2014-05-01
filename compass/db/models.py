@@ -44,6 +44,36 @@ class JSONEncodedDict(TypeDecorator):
         return value
 
 
+import collections
+from sqlalchemy.ext.mutable import Mutable
+
+class MutationDict(Mutable, dict):
+    @classmethod
+    def coerce(cls, key, value):
+        "Convert plain dictionaries to MutationDict."
+
+        if not isinstance(value, MutationDict):
+            if isinstance(value, dict):
+                return MutationDict(value)
+
+            # this call will raise ValueError
+            return Mutable.coerce(key, value)
+        else:
+            return value
+
+    def __setitem__(self, key, value):
+        "Detect dictionary set events and emit change events."
+
+        dict.__setitem__(self, key, value)
+        self.changed()
+
+    def __delitem__(self, key):
+        "Detect dictionary del events and emit change events."
+
+        dict.__delitem__(self, key)
+        self.changed()
+
+
 class TimestampMixin(object):
     created_at = Column(DateTime, default=lambda: datetime.now())
     updated_at = Column(DateTime, default=lambda: datetime.now(),
@@ -264,8 +294,8 @@ class Cluster(BASE, TimestampMixin, HelperMixin):
     id = Column(Integer, primary_key=True)
     name = Column(String(80), unique=True)
     editable = Column(Boolean, default=True)
-    os_global_config = Column(JSONEncodedDict)
-    package_global_config = Column(JSONEncodedDict)
+    os_global_config = Column(MutationDict.as_mutable(JSONEncodedDict), default={})
+    package_global_config = Column(MutationDict.as_mutable(JSONEncodedDict), default={})
     adapter_id = Column(Integer, ForeignKey('adapter.id'))
     os_id = Column(Integer, ForeignKey('os.id'))
     created_by = Column(Integer, ForeignKey('user.id'))
