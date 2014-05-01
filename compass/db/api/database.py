@@ -61,7 +61,7 @@ OS_CONFIG_META_DEF = [
 ]
 # OS config field
 OS_CONFIG_FIELD_DEF = [
-    {"name": "languge", "validator": None, 'is_required': True, 'ftype': 'str'},
+    {"name": "language", "validator": None, 'is_required': True, 'ftype': 'str'},
     {"name": "timezone", "validator": None, 'is_required': True, 'ftype': 'str'},
     {"name": "ip", "validator": 'is_valid_ip', 'is_required': True, 'ftype': 'str'},
     {"name": "netmask", "validator": 'is_valid_netmask', 'is_required': True, 'ftype': 'str'},
