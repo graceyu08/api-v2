@@ -38,10 +38,7 @@ def get_adapter(adapter_id, return_roles=False):
 def get_adapter_config_schema(adapter_id, os_id):
 
     with database.session() as session:
-        try:
-            adapter = _get_adapter(session, adapter_id)
-        except RecordNotExists as ex:
-            raise RecordNotExists(ex.message)
+        adapter = _get_adapter(session, adapter_id)
 
         os_list = []
         if not os_id:
@@ -84,7 +81,7 @@ def _list_adapters(session, filters=None):
     filters = filters or {}
 
     with session.begin(subtransactions=True):
-        query = api.model_query(sessioN, Adapter)
+        query = api.model_query(session, Adapter)
         adapters = api.model_filter(query, Adapter,
                                     filters, SUPPORTED_FILTERS).all()
 

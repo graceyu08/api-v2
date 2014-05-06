@@ -21,7 +21,10 @@ MAPPER = {
 
 
 def validate_config(session, config, id_name, id_value, patch=True):
-
+    """ Validates the given config value according to the config
+        metadata of the asscoiated os_id or adapter_id. Returns
+        a tuple (status, message).
+    """
     if id_name not in MAPPER.keys():
         return (False, "Invalid id type %s" % id_name)
 
@@ -102,6 +105,8 @@ def _validate_config_helper(session, config,
                                        "invalid format or None!" % key)
                             return (False, err_msg)
 
+                # This is a PUT request. We need to check presence of all
+                # required fields.
                 if not patch:
                     for field in fields:
                         name = field.field
