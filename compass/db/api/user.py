@@ -1,5 +1,5 @@
+from compass.db import api
 from compass.db.api import database
-from compass.db.api import utils
 from compass.db.api.utils import wrap_to_dict
 from compass.db.exception import *
 from compass.db.models import User
@@ -8,9 +8,7 @@ from compass.db.models import User
 SUPPORTED_FILTERS = ['email', 'admin']
 UPDATED_FIELDS = ['firstname', 'lastname', 'password']
 RESP_FIELDS = ['id', 'email', 'is_admin', 'active', 'firstname',
-                       'lastname', 'created_at', 'last_login_at']
-USER = 'user'
-USERS = 'users'
+               'lastname', 'created_at', 'last_login_at']
 
 ERROR_MSG = {
     'findNoUser': 'Cannot find the user, ID is %d',
@@ -22,12 +20,12 @@ ERROR_MSG = {
 @wrap_to_dict(RESP_FIELDS)
 def get_user(user_id):
     with database.session() as session:
-       user = _get_user(session, user_id)
-       if not user:
-           err_msg = ERROR_MSG['findNoUser'] % user_id
-           raise RecordNotExists(err_msg)
+        try:
+            user = _get_user(session, user_id)
+        except RecordNotExists as ex:
+            raise RecordNotExists(ex.message)
 
-       user_info = user.to_dict()
+        user_info = user.to_dict()
 
     return user_info
 
@@ -35,28 +33,26 @@ def get_user(user_id):
 @wrap_to_dict(RESP_FIELDS)
 def list_users(filters=None):
     """List all users, optionally filtered by some fields"""
-    if filters:
-        filters = utils.get_legal_filters(USER, filters)
-
     with database.session() as session:
         users = _list_users(session, filters)
         users_list = [user.to_dict() for user in users]
-            
+
     return users_list
 
 
-@wrap_to_dict
-def add_user(created_by, email, password, firstname=None, lastname=None):
+@wrap_to_dict(RESP_FIELDS)
+def add_user(creator_id, email, password, firstname=None, lastname=None):
     """Create a user"""
     REQUIRED_PERM = 'create_user'
 
     with database.session() as session:
-        user = _get_user(session, created_by)
-        if not user:
-            err_msg = ERROR_MSG['findNoUser'] % created_by
-            raise RecordNotExists(err_msg)
 
-        if not user.is_admin or REQUIRED_PERM not in user.permissions:
+        try:
+            creator = _get_user(session, admin_id)
+        except RecordNotExists as ex:
+            raise RecordNotExists(ex.message)
+
+        if not creator.is_admin or REQUIRED_PERM not in creator.permissions:
             # The user is not allowed to create a user.
             err_msg = ERROR_MSG['forbidden']
             raise Forbidden(err_msg)
@@ -72,13 +68,15 @@ def add_user(created_by, email, password, firstname=None, lastname=None):
     return new_user_info
 
 
+@wrap_to_dict(RESP_FIELDS)
 def update_user(user_id, **kwargs):
     """Update a user"""
     with database.session() as session:
         user = _get_user(session, user_id)
-        if not user:
-            err_msg = ERROR_MSG['findNoUser'] % user_id
-            raise RecordNotExists(err_msg)
+        try:
+            user = _get_user(session, user_id)
+        except RecordNotExists as ex:
+            raise RecordNotExists(ex.message)
 
         update_info = {}
         for key in kwargs:
@@ -95,6 +93,9 @@ def _get_user(session, user_id):
     """Get the user by ID"""
     with session.begin(subtransactions=True):
         user = session.query(User).filter_by(id=user_id).first()
+        if not user:
+            err_msg = ERROR_MSG['findNoUser'] % user_id
+            raise RecordNotExists(err_msg)
 
     return user
 
@@ -105,15 +106,8 @@ def _list_users(session, filters=None):
     filters = filters if filters else {}
 
     with session.begin(subtransactions=True):
-        query = session.query(User)
-        if filters:
-            for key in filters:
-                if isinstance(filters[key], list):
-                    query = query.filter(getattr(User, key).in_(filters[key]))
-                else:
-                    query = query.filter(getattr(User, key) == filters[key])
-
-        users = query.all()
+        query = api.model_query(session, User)
+        users = api.model_filter(query, User, filters, SUPPORTED_FILTERS).all()
 
     return users
 

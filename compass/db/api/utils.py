@@ -1,16 +1,10 @@
-import logging
-
-
-SUPPORTED_FILTERS = {
-    "user": ['email', 'is_admin'],
-    "adapter": ['name'],
-    "cluster": ['name',"adapter", "created_by"]
-}
+from functools import wraps
 
 
 def wrap_to_dict(support_keys=None):
-    def wrap(func):
-        def wrapped_f(*args, **kwargs):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             obj = func(*args, **kwargs)
             obj_info = None
             if isinstance(obj, list):
@@ -19,8 +13,8 @@ def wrap_to_dict(support_keys=None):
                 obj_info = _wrapper_dict(obj, support_keys)
 
             return obj_info
-        return wrapped_f
-    return wrap
+        return wrapper
+    return decorator
 
 
 def _wrapper_dict(data, support_keys=None):
@@ -34,19 +28,3 @@ def _wrapper_dict(data, support_keys=None):
             info[key] = data[key]
 
     return info
-
-
-def get_legal_filters(table_name, filters):
-    """Get legal filters"""
-    legal_filters = {}
-    try:
-        supported_filters = SUPPORTED_FILTERS[table_name]
-    except KeyError:
-        logging.debug("Cannot find supported filters for table %s", table_name)
-        return None
-
-    for name in filters:
-        if name in supported_filters:
-            legal_filters[name] = filters[name]
-
-    return legal_filters

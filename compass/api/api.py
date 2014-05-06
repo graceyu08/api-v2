@@ -117,14 +117,16 @@ def login():
                 user = auth.authenticate_user(email, password)
                 if not user:
                     flash('Wrong username or password!', 'error')
-                    return redirect('/login.html?next=' % request.args.get('next'))
+                    next_url = '/login.html?next=' % request.args.get('next')
+                    return redirect(next_url)
 
                 if login_user(user, remember=request.form['remember']):
                     # Enable session expiration if user didnot choose to be
                     # remembered.
                     app_session.permanent = not request.form['remember']
                     flash('Logged in successfully!', 'success')
-                    return redirect(request.args.get('next') or url_for('index'))
+                    return redirect(
+                        request.args.get('next') or url_for('index'))
                 else:
                     flash('This username is disabled!', 'error')
 
@@ -139,7 +141,7 @@ def _get_user(user_id):
         return user
 
     except Exception as err:
-        logging.info('Failed to get user from id %d! Error: %s',(id, err))
+        logging.info('Failed to get user from id %d! Error: %s', (id, err))
         return None
 
 

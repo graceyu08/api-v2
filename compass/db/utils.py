@@ -1,5 +1,6 @@
 import copy
 
+
 def merge_dict(lhs, rhs, override=True):
     """Merge nested right dict into left nested dict recursively.
 

@@ -21,7 +21,7 @@ class BadRequest(Exception):
 
 
 class Unauthorized(Exception):
-    """"""
+    """Define the exception for invalid user login."""
     def __init__(self, message):
         super(Unauthorized, self).__init__(message)
         self.message = message
@@ -31,7 +31,8 @@ class Unauthorized(Exception):
 
 
 class UserDisabled(Exception):
-    """"""
+    """Define the exception that a disabled user tries to do some operations.
+    """
     def __init__(self, message):
         super(UserDisabled, self).__init__(message)
         self.message = message
@@ -41,7 +42,9 @@ class UserDisabled(Exception):
 
 
 class Forbidden(Exception):
-    """"""
+    """Define the exception that a user tries to do some operations without
+       valid permissions.
+    """
     def __init__(self, message):
         super(Forbidden, self).__init__(message)
         self.message = message
@@ -51,7 +54,8 @@ class Forbidden(Exception):
 
 
 class BadMethod(Exception):
-    """"""
+    """Define the exception for invoking unsupprted or unimplemented methods.
+    """
     def __init__(self, message):
         super(BadMethod, self).__init__(message)
         self.message = message
@@ -61,7 +65,7 @@ class BadMethod(Exception):
 
 
 class ConflictObject(Exception):
-    """"""
+    """Define the exception for creating an existing object."""
     def __init__(self, message):
         super(ConflictObject, self).__init__(message)
         self.message = message

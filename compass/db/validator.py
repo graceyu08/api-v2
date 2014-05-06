@@ -36,6 +36,9 @@ def is_valid_ipNetowrk(ip_network):
 
 def is_valid_netmask(ip_addr):
     """Valid the format of a netmask."""
+    if not ip_addr:
+        return False
+
     try:
         ip_address = netaddr.IPAddress(ip_addr)
         return ip_address.is_netmask()
@@ -46,6 +49,9 @@ def is_valid_netmask(ip_addr):
 
 def is_valid_gateway(ip_addr):
     """Valid the format of gateway."""
+
+    if not ip_addr:
+        return False
 
     invalid_ip_prefix = ['0', '224', '169', '127']
     try:

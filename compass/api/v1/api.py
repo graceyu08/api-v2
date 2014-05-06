@@ -37,6 +37,8 @@ PREFIX = '/v1.0'
 
 @v1_app.route('/users', methods=['GET'])
 def list_users():
+    """List details of all users filtered by user email and admin role."""
+
     emails = request.args.getlist('email')
     is_admin = request.args.get('admin')
 
@@ -60,16 +62,14 @@ class User(Resource):
     ENDPOINT = PREFIX + '/users'
 
     def get(self, user_id):
-        """Get user's information for specified ID."""
+        """Get user's information for the specified ID."""
         try:
             user_data = db_api.get_user(user_id)
             logging.debug("user_data is===>%s", user_data)
 
         except RecordNotExists as ex:
             error_msg = ex.message
-            return handle_not_exist(
-                ItemNotFound(error_msg)
-            )
+            return handle_not_exist(ItemNotFound(error_msg))
 
         return utils.make_json_response(200, user_data)
 
@@ -85,8 +85,26 @@ class User(Resource):
         """Delete a user"""
         pass
 
+
+class Adapter(Resource):
+    ENDPOINT = PREFIX + "/adapters"
+
+    def get(self, adapter_id):
+        """Get information for a specified adapter."""
+
+        try:
+            adapter_info = db_api.get_adapter(adapter_id)
+        except RecordNotExists as ex:
+            error_msg = ex.message
+            return handle_not_exist(ItemNotFound(error_msg))
+
+        return utils.make_json_response(200, adapter_info)
+
+
 @v1_app.route('/adapters', methods=['GET'])
 def list_adapters():
+    """ List details of all adapters filtered by the adapter name(s)."""
+
     names = request.args.getlist('name')
     filters = {}
     if names:
@@ -96,49 +114,36 @@ def list_adapters():
     return utils.make_json_response(200, adapters_list)
 
 
-@v1_app.route('/adapters/<int:adapter_id>/os/<int:os_id>/config-schema',
-              methods=['GET'])
-def get_adapter_config_schema(adapter_id, os_id):
+@v1_app.route('/adapters/<int:adapter_id>/config-schema', methods=['GET'])
+def get_adapter_config_schema(adapter_id):
+    """Get the config schema for a specified adapter."""
+
+    os_id = request.args.get("os-id", type=int)
 
     try:
         schema = db_api.get_adapter_config_schema(adapter_id, os_id)
     except RecordNotExists as ex:
-        return handle_not_exist(
-            ItemNotFound(ex.message)
-        )
+        return handle_not_exist(ItemNotFound(ex.message))
 
     return utils.make_json_response(200, schema)
 
 
 @v1_app.route('/adapters/<int:adapter_id>/roles', methods=['GET'])
 def get_adapter_roles(adapter_id):
+    """Get roles for a specified adapter."""
+
     try:
         roles = db_api.get_adapter(adapter_id, True)
     except RecordNotExists as ex:
-        return handle_not_exist(
-            ItemNotFound(ex.message)
-        )
+        return handle_not_exist(ItemNotFound(ex.message))
 
     return utils.make_json_response(200, roles)
 
 
-class Adapter(Resource):
-    ENDPOINT = PREFIX + "/adapters"
-
-    def get(self, adapter_id):
-        try:
-            adapter_info = db_api.get_adapter(adapter_id)
-            print adapter_info
-        except RecordNotExists as ex:
-            error_msg = ex.message
-            return handle_not_exist(
-                ItemNotFound(error_msg)
-            )
-        return utils.make_json_response(200, adapter_info)
-
-
 class Cluster(Resource):
     def get(self, cluster_id):
+        """Get information for a specified cluster."""
+
         try:
             cluster_info = db_api.get_cluster(cluster_id)
 
@@ -152,26 +157,38 @@ class Cluster(Resource):
 
 @v1_app.route('/clusters/<int:cluster_id>/config', methods=['PUT', 'PATCH'])
 def add_cluster_config(cluster_id):
-        config = json.loads(request.data)
-        if not config:
-            return handle_bad_request(
-                BadRequest("Config cannot be None!")
-            )
+    """Update the config information for a specified cluster."""
+    config = json.loads(request.data)
+    if not config:
+        return handle_bad_request(
+            BadRequest("Config cannot be None!")
+        )
 
-        result = None
-        try:
-            if "os_config" in config:
-                result = db_api.update_cluster_config(cluster_id, config,
-                                                      patch=request.method=='PATCH')
-            elif "package_config" in config:
-                result = db_api.update_cluster_config(cluster_id, config,
-                                                      is_os_config=False,
-                                                      patch=request.method=='PATCH')
-        except InvalidParameter as ex:
-            return handle_bad_request(
-                BadRequest(ex.message)
-            )
-        return utils.make_json_response(200, result)
+    root_elems = ['os_config', 'package_config']
+    if len(config.keys()) != 1 or config.keys()[0] not in root_elems:
+        error_msg = ("Config root elements must be either"
+                     "'os_config' or 'package_config'")
+        return handle_bad_request(BadRequest(error_msg))
+
+    result = None
+    is_patch_method = request.method == 'PATCH'
+    try:
+        if "os_config" in config:
+            result = db_api.update_cluster_config(cluster_id, 'os_config',
+                                                  config,
+                                                  patch=is_patch_method)
+        elif "package_config" in config:
+            result = db_api.update_cluster_config(cluster_id,
+                                                  'package_config', config,
+                                                  patch=is_patch_method)
+
+    except InvalidParameter as ex:
+        return handle_bad_request(BadRequest(ex.message))
+
+    except RecordNotExists as ex:
+        return handle_not_exist(ItemNotFound(ex.message))
+
+    return utils.make_json_response(200, result)
 
 
 api.add_resource(User,
@@ -209,6 +226,7 @@ def handle_invalid_user(error, failed_objs=None):
         message.update(failed_objs)
 
     return utils.make_json_response(401, message)
+
 
 @v1_app.errorhandler(Forbidden)
 def handle_no_permission(error, failed_objs=None):
