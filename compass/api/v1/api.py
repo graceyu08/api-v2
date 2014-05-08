@@ -19,33 +19,21 @@ import simplejson as json
 from flask import Blueprint
 from flask import request
 
-from flask.ext.restful import Api
 from flask.ext.restful import Resource
 
 from compass.api.exception import *
+from compass.api.restfulAPI import CompassApi
 from compass.api import utils
 
 from compass.db import db_api
 from compass.db.exception import RecordNotExists
 from compass.db.exception import InvalidParameter
 
-class MyApi(Api):
-    # Override the Flask_Restful error routing for 500.
-    def error_router(self, original_handler, e):
-        code = getattr(e, 'code', 500)
-        if code >= 500:      # for HTTP 500 errors return my custom response
-            return original_handler(e)
-
-        return super(Api, self).error_router(original_handler, e)
 
 v1_app = Blueprint('v1_app', __name__)
-api = MyApi(v1_app)
+api = CompassApi(v1_app)
 PREFIX = '/v1.0'
 
-# TODO(Grace): for demo purpose only.
-@v1_app.app_errorhandler(ItemNotFound)
-def handleNotFound(ex):
-    return utils.make_json_response(404, "not found")
     
 @v1_app.route('/users', methods=['GET'])
 def list_users():
@@ -53,7 +41,6 @@ def list_users():
 
     emails = request.args.getlist('email')
     is_admin = request.args.get('admin')
-    raise ItemNotFound("test error_msg")
     filters = {}
 
     if emails:
@@ -108,7 +95,7 @@ class Adapter(Resource):
             adapter_info = db_api.get_adapter(adapter_id)
         except RecordNotExists as ex:
             error_msg = ex.message
-            return handle_not_exist(ItemNotFound(error_msg))
+            raise ItemNotFound(error_msg)
 
         return utils.make_json_response(200, adapter_info)
 
@@ -135,7 +122,7 @@ def get_adapter_config_schema(adapter_id):
     try:
         schema = db_api.get_adapter_config_schema(adapter_id, os_id)
     except RecordNotExists as ex:
-        return handle_not_exist(ItemNotFound(ex.message))
+        raise ItemNotFound(ex.message)
 
     return utils.make_json_response(200, schema)
 
@@ -147,7 +134,7 @@ def get_adapter_roles(adapter_id):
     try:
         roles = db_api.get_adapter(adapter_id, True)
     except RecordNotExists as ex:
-        return handle_not_exist(ItemNotFound(ex.message))
+        raise ItemNotFound(ex.message)
 
     return utils.make_json_response(200, roles)
 
@@ -161,9 +148,8 @@ class Cluster(Resource):
 
         except RecordNotExists as ex:
             error_msg = ex.message
-            return handle_not_exist(
-                ItemNotFound(error_msg)
-            )
+            raise ItemNotFound(error_msg)
+
         return utils.make_json_response(200, cluster_info)
 
 
@@ -172,15 +158,13 @@ def add_cluster_config(cluster_id):
     """Update the config information for a specified cluster."""
     config = json.loads(request.data)
     if not config:
-        return handle_bad_request(
-            BadRequest("Config cannot be None!")
-        )
+        raise BadRequest("Config cannot be None!")
 
     root_elems = ['os_config', 'package_config']
     if len(config.keys()) != 1 or config.keys()[0] not in root_elems:
         error_msg = ("Config root elements must be either"
                      "'os_config' or 'package_config'")
-        return handle_bad_request(BadRequest(error_msg))
+        raise BadRequest(error_msg)
 
     result = None
     is_patch_method = request.method == 'PATCH'
@@ -195,10 +179,10 @@ def add_cluster_config(cluster_id):
                                                   patch=is_patch_method)
 
     except InvalidParameter as ex:
-        return handle_bad_request(BadRequest(ex.message))
+        raise BadRequest(ex.message)
 
     except RecordNotExists as ex:
-        return handle_not_exist(ItemNotFound(ex.message))
+        raise ItemNotFound(ex.message)
 
     return utils.make_json_response(200, result)
 
