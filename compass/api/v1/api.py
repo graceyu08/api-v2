@@ -29,19 +29,31 @@ from compass.db import db_api
 from compass.db.exception import RecordNotExists
 from compass.db.exception import InvalidParameter
 
+class MyApi(Api):
+    # Override the Flask_Restful error routing for 500.
+    def error_router(self, original_handler, e):
+        code = getattr(e, 'code', 500)
+        if code >= 500:      # for HTTP 500 errors return my custom response
+            return original_handler(e)
+
+        return super(Api, self).error_router(original_handler, e)
 
 v1_app = Blueprint('v1_app', __name__)
-api = Api(v1_app)
+api = MyApi(v1_app)
 PREFIX = '/v1.0'
 
-
+# TODO(Grace): for demo purpose only.
+@v1_app.app_errorhandler(ItemNotFound)
+def handleNotFound(ex):
+    return utils.make_json_response(404, "not found")
+    
 @v1_app.route('/users', methods=['GET'])
 def list_users():
     """List details of all users filtered by user email and admin role."""
 
     emails = request.args.getlist('email')
     is_admin = request.args.get('admin')
-
+    raise ItemNotFound("test error_msg")
     filters = {}
 
     if emails:
@@ -69,7 +81,7 @@ class User(Resource):
 
         except RecordNotExists as ex:
             error_msg = ex.message
-            return handle_not_exist(ItemNotFound(error_msg))
+            raise ItemNotFound(error_msg)
 
         return utils.make_json_response(200, user_data)
 
