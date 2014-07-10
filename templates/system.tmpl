@@ -1,0 +1,32 @@
+{
+    "name": "$host.fullname",
+    "hostname": "$host.hostname",
+    "profile": "$profile",
+    "gateway": "$defalut_gateway",
+    "name_servers": "$name_servers",
+    "name_servers_search": "$search_path",
+    "proxy": "$http_proxy",
+    "interfaces": {
+        #for $nic_info in $networks
+        "$nic_info.interface": {
+            "ip_address": "$nic_info.ip",
+            "netmask": "$nic_info.netmask",
+            "management": $nic_info.is_mgmt,
+            #if $nic_info.is_mgmt
+            "mac_address": "$host.mac_address",
+            "dns_name": "$host.dns",
+            #end if
+            "static": True
+        }
+        #end for
+    },
+    "ksmeta":{
+        "username": "$server_crendentials.username",
+        "password": "$server_crendentials.password",
+        "partition": "$partition",
+        "https_proxy": "$https_proxy",
+        "ignore_proxy": "$ignore_proxy",
+        "ntp_server": "$ntp_server"
+    }
+}
+

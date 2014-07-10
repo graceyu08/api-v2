@@ -28,36 +28,19 @@ from compass.utils import util
 class ChefInstaller(PKInstaller):
     """chef package installer."""
     NAME = 'chef'
-    TMPL_DIR = 'TMPL_DIR'
-    COMPASS_DATABAG = "compass_databag"
-    CHEFSERVER_URL = "chef_server_url"
-    KEY = "key_path"
-    CLIENT = "client_name"
+    ENV_TMPL_NAME = 'env.tmpl'
+    NODE_TMPL_NAME = 'node.tmpl'
+    DATABAGITEM_TMPL_NAME = 'databagitem.tmpl'
 
-    def __init__(self, adapter_info, config):
+    def __init__(self, adapter_info, cluster_info, hosts_info):
         super(ChefInstaller, self).__init__()
 
-        self.config_manager = ChefConfigManager(adapter_info, config)
-        installer_settings = self.config_manager.get_pk_installer_settings()
-
-        tmpl_dir = os.path.join(setting.TMPL_DIR, self.NAME)
-        self.env_dir = os.path.join(tmpl_dir, 'environments')
-        self.databag_dir = os.path.join(tmpl_dir, 'databags')
-
-        if self.CHEFSERVER_URL not in installer_settings:
-            raise Exception("No chef server url provided!")
-
-        self.installer_url_ = installer_settings[self.CHEFSERVER_URL]
-
-        self.compass_databag = None
-        key = None
-        client = None
-        if self.COMPASS_DATABAG in installer_settings:
-            self.compass_databag = installer_settings[self.COMPASS_DATABAG]
-
-        if self.KEY in installer_settings and self.CLIENT in installer_settings:
-            key = installer_settings[self.KEY]
-            client = installer_settings[self.CLIENT]
+        self.config_manager = ChefConfigManager(adapter_info, cluster_info,
+                                                hosts_info)
+        self.tmpl_dir = self.config_manager.get_target_system_tmpl_dir()
+        self.installer_url_ = self.config_manager.get_chef_url()
+        self.databag = self.config_manager.get_databag_name()
+        key, client = self.config_manager.get_chef_credentials()
 
         self.api_ = self._get_chef_api(key, client)
         logging.debug('%s instance created', self)
@@ -77,7 +60,7 @@ class ChefInstaller(PKInstaller):
             else:
                 chef_api = chef.autoconfigure()
 
-        except Exception as ex: 
+        except Exception as ex:
             raise Exception("Failed to instantiate chef API, error: %s",
                             ex.message)
         return chef_api
@@ -136,22 +119,34 @@ class ChefInstaller(PKInstaller):
         logging.debug('The Run List for node %s is %s',
                       node.name, node.run_list)
 
-    def set_chef_env(self, node, env_name):
+    def set_node_env(self, node, env_name):
         """Set chef environment to node."""
         if not node:
             raise Exception("Node is None!")
 
         node_env = node.chef_environment
-        if env_name != node_env:
+        if not node_env or node_env == 'default':
             node.chef_environment = env_name
 
         node.save()
 
-    def update_node_attributes(self, node_name, node_attr_dict):
+    def update_node_attributes(self, node, vars_dict):
         """Create or update node run_list and environment."""
-        pass
 
-    def create_or_update_environment(self, env_name, vars_dict):
+        node_tmpl_dir = os.path.join(self.tmpl_dir, self.NODE_TMPL_NAME)
+        if not os.path.exists(node_tmpl_dir):
+            logging.info(("No node template found!"
+                          "No attributes will be updated!"))
+            return
+        node_tmpl = Template(file=node_tmpl_dir, searchList=[vars_dict])
+        node_attr_dict = json.loads(node_tmpl.respond())
+
+        for attr in node_attr_dict:
+            setattr(node, attr, node_attr_dict[attr])
+
+        node.save()
+
+    def update_environment(self, env_name, vars_dict):
         """Generate environment config based on the template file and
            upload it to chef server. Return environment name.
         """
@@ -170,7 +165,7 @@ class ChefInstaller(PKInstaller):
                 setattr(env, attr, env_content[attr])
         env.save()
 
-    def create_or_update_databag(self, search_list):
+    def update_databag(self, vars_dict):
         """Generate databag config based on the template file and upload
            it to chef server. Return databag name.
         """
@@ -191,25 +186,10 @@ class ChefInstaller(PKInstaller):
         if not self.config:
             raise Exception("No config for package installer found!")
         adapter_name = self.config_manager.get_adapter_name()
-        mapping_callback = getattr((os.path.join(self.mapping_callback_dir,
-                                                 adapter_name)),
-                                    'generate_deploy_config')
-        deploy_config = {}
-        if mapping_callback:
-            deploy_config = mapping_callback(self.config_manager)
-        else:
-            # Use default callback to generate deploy_config
-            deploy_config = self._generate_deploy_config()
-
-        try:
-            self.config_manager.set_deploy_config(deploy_config)
-        except Exception as ex:
-            raise Exception(ex.message)
-
         env_name = self._get_env_name(adapter_name)
 
         cheetah_search_list = self._get_tmpl_vars()
-        self.create_or_update_environment(env_name, cheetah_search_list)
+        self.update_environment(env_name, cheetah_search_list)
 
         host_list = self.config_manager.get_host_id_list()
         for host_id in host_list:
@@ -217,32 +197,34 @@ class ChefInstaller(PKInstaller):
             roles = self.config_manager.get_host_roles(host_id)
 
             node = self.get_node(node_name)
-            self.set_chef_env(node, env_name)
+            self.set_node_env(node, env_name)
             self.add_roles(node, roles)
 
-        return deploy_config
-
-    def _generate_deploy_config(self):
-        """Re-organize the original os config for each host by grouping it
-           by roles(KEY: "role_mapping"). Add some more config items
-           to the new config. The format for re-organzied config will be:
-        """
-        pass
-
-    def get_pk_info_for_os_installer(self):
+    def generate_installer_config(self):
         """Render chef config file (client.rb) by OS installing right after
            OS is installed successfully.
+           The output format: 
+           {
+              '1'($host_id):{
+                  'tool': 'chef',
+                  'chef_url': 'https://xxx',
+                  'chef_client_name': '$host_fullname',
+                  'chef_node_name': '$host_fullname'
+              },
+              .....
+           }
         """
-        host_list = self.original_config['hosts']
+        host_ids = self.config_manager.get_host_id_list()
         os_installer_configs = {}
-        for host_info in host_list:
+        for host_id in host_ids:
+            fullname = self.config_manager.get_host_fullname(host_id)
             temp = {
                 "tool": "chef",
                 "chef_url": self.installer_url_
             }
-            temp['chef_client_name'] = host_info['fullname']
-            temp['chef_node_name'] = host_info['fullname']
-            os_installer_configs[host_info['host_id']] = temp
+            temp['chef_client_name'] = fullname
+            temp['chef_node_name'] = fullname
+            os_installer_configs[host_id] = temp
 
         return os_installer_configs
 
@@ -269,16 +251,7 @@ class ChefInstaller(PKInstaller):
 
         return target_systems
 
-    def __get_compass_databag(self):
-        import chef
-        databags = chef.DataBag.list(api=self.api_)
-        if self.compass_databag not in databags:
-            raise Exception("Cannot find databag called '%s'!",
-                            self.compass_databag)
-        databag = chef.DataBag(self.compass_databag, self.api_)
-        return databag
-
-    def __get_compass_databag_item(self, item_name):
+    def __get_databag_item(self, item_name):
         """Get compass databag item."""
         import chef
         databag = self.__get_compass_databag()
@@ -328,28 +301,46 @@ PKInstaller.register(ChefInstaller)
 
 
 class ChefConfigManager(BaseConfigManager):
+    TMPL_DIR = 'template_dir'
+    DATABAG_NAME = "databag"
+    CHEFSERVER_URL = "chef_server_url"
+    KEY_DIR = "key_dir"
+    CLIENT = "client_name"
+
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(ChefConfigManager, self).__init__(adapter_info,
                                                 cluster_info,
                                                 hosts_info)
 
-    def get_network_mapping(self):
-        cluster_pk_config = self.get_cluster_pk_config()
-        if 'network_mapping' not in cluster_pk_config:
-            logging.info("No keyword 'network_mapping' find!")
+    def get_target_system_tmpl_dir(self):
+        pk_installer_settings = self.get_pk_installer_settings()
+        if self.TMPL_DIR not in pk_installer_settings:
+            raise KeyError("'%s' must be set in package settings!",
+                           self.TMPL_DIR)
+        return pk_installer_settings[self.TMPL_DIR]
+
+    def get_chef_url(self):
+        pk_installer_settings = self.get_pk_installer_settings()
+        if self.CHEFSERVER_URL not in pk_installer_settings:
+            raise KeyError("'%s' must be set in package settings!",
+                           self.CHEFSERVER_URL)
+
+        return pk_installer_settings[self.CHEFSERVER_URL]
+
+    def get_chef_credentials(self):
+        pk_installer_settings = self.get_pk_installer_settings()
+        if self.KEY_DIR in pk_installer_settings and\
+            self.CLIENT in pk_installer_settings:
+            cred = (pk_installer_settings[self.KEY_DIR],
+                    pk_installer_settings[self.CLIENT])
+            return cred
+
+        return (None, None)
+
+    def get_databag_name(self):
+        pk_installer_settings = self.get_pk_installer_settings()
+        if self.DATABAG_NAME not in pk_installer_settings:
+            logging.info("No databag name provided for this adapter!")
             return None
 
-        return cluster_pk_config['network_mapping']
-
-    def get_host_roles(self, host_id):
-        host_info = self.get_host_info(host_id)
-        if not host_info:
-            return None
-
-        return host_info['roles']
-
-    def get_cluster_role_mapping(self):
-        if not self.deploy_config:
-            raise Exception('Deploy config has not been set yet!')
-
-        return self.deploy_config['cluster']['role_mapping']
+        return pk_installer_settings[self.DATABAG_NAME]

@@ -13,8 +13,6 @@
 # limitations under the License.
 
 """os installer cobbler plugin.
-
-   .. moduleauthor:: Xiaodong Wang <xiaodongwang@huawei.com>
 """
 import logging
 import os.path
@@ -74,36 +72,22 @@ class CobblerInstaller(OSInstaller):
             oses.append(profile['name'])
         return oses
 
-    def deploy(self, os_version):
+    def deploy(self):
         """Sync cobbler to catch up the latest update config and start to
            install OS.
         """
-        if not self.os_config:
-            raise Exception("No OS config found!")
-
-        host_config_list = self.os_config['hosts']
-        for host_info in host_config_list:
-            host_id = host_info['host_id']
-            fullname = host_info['fullname']
-            host_config = host_info['config']
+        os_version = self.config_manager.get_os_version()
+        host_ids = self.config_manager.get_host_id_list()
+        for host_id in host_ids:
+            fullname = self.config_manager.get_host_fullname(host_id)
 
             self.update_host_os_config_to_server(host_id, fullname,
                                                  host_config, os_version)
         # sync to cobbler and trigger installtion.
         self._sync()
 
-    def set_config(self, os_config):
-        self.os_config = os_config
-
-    def set_package_installer_config(self, pk_installer_configs):
-        host_config_list = self.os_config['hosts']
-        if pk_installer_configs:
-            for host_info in host_config_list:
-                host_id = host_info['host_id']
-                if host_id in pk_installer_configs:
-                    host_info['pk_installer'] = pk_installer_configs[host_id]
-                else:
-                    host_info['pk_installer'] = {}
+    def set_package_installer_config(self, package_configs):
+        self.pk_installer_config = package_configs
 
     def _sync(self):
         """Sync the updated config to cobbler and trigger installation."""
@@ -174,10 +158,11 @@ class CobblerInstaller(OSInstaller):
 
     def clean_progress(self):
         """clean log files and config for hosts which to deploy."""
-        host_list = self.os_config['hosts']
+        host_list = self.config_manager.get_host_id_list()
         log_dir_prefix = setting.INSTALLATION_LOGDIR[self.NAME]
-        for entity in host_list:
-            self._clean_log(log_dir_prefix, entity['fullname'])
+        for host_id in host_list:
+            fullname = self.config_manager.get_host_fullname(host_id)
+            self._clean_log(log_dir_prefix, fullname)
 
     def _clean_log(self, log_dir_prefix, system_name):
         """clean log."""
@@ -186,9 +171,9 @@ class CobblerInstaller(OSInstaller):
 
     def redeploy(self):
         """redeploy hosts."""
-        config_list = self.os_config['hosts']
-        for entity in config_list:
-            fullname = entity['fullname']
+        host_ids = self.config_manager.get_host_id_list()
+        for host_id in host_ids:
+            fullname = self.config_manager.get_host_fullname(host_id)
             sys_id = self._get_system_id(fullname, False)
             if sys_id:
                 self._netboot_enabled(sys_id)
@@ -222,12 +207,12 @@ class CobblerInstaller(OSInstaller):
             logging.info("Deleting host got exception: %s", ex.message)
 
 
-Installer.register(Installer)
+OSInstaller.register(CobblerInstaller)
 
 
 class CobblerConfigManager(BaseConfigManager):
+
     def __init__(self, adapter_info, cluster_info, hosts_info):
-        super(ChefConfigManager, self).__init__(adapter_info,
+        super(CobblerConfigManager, self).__init__(adapter_info,
                                                 cluster_info,
                                                 hosts_info)
-        
