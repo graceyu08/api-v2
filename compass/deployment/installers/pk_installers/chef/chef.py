@@ -174,9 +174,10 @@ class ChefInstaller(PKInstaller):
     def _get_tmpl_vars(self):
         pk_metadata = self.config_manager.get_pk_config_meatadata()
         pk_config = self.config_manager.get_cluster_pk_config()
-        vars_dict = self._Installer._get_tmpl_vars_from_metadata(pk_metadata,
-                                                                 pk_config)
+
+        vars_dict = self.get_tmpl_vars_from_metadata(pk_metadata, pk_config)
         role_mapping_config = self.config_manager.get_cluster_role_mapping()
+
         util.merge_dict(vars_dict, role_mapping_config)
         return vars_dict
 

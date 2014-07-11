@@ -16,8 +16,6 @@
 """
 import logging
 
-from compass.db import db_api
-
 
 class Installer(object):
     """Interface for installer."""
@@ -40,7 +38,7 @@ class Installer(object):
     def redeploy(self, **kwargs):
         pass
 
-    def _get_tmpl_vars_from_metadata(self, metadata, config):
+    def get_tmpl_vars_from_metadata(self, metadata, config):
         template_vars = {}
         self._get_tmpl_vars_helper(metadata, config, template_vars)
 
@@ -80,6 +78,9 @@ class Installer(object):
 class OSInstaller(Installer):
     """Interface for os installer."""
     NAME = 'OSInstaller'
+    FULLNAME = 'fullname'
+    MAC_ADDR = 'mac_address'
+    HOSTNAME = 'hostname'
     OS_INSTALLERS = {}
 
     def get_oses(self):
@@ -88,17 +89,6 @@ class OSInstaller(Installer):
         :returns: list of str, each is the supported os version.
         """
         return []
-
-    def _get_template_vars_from_metadata(self, adapter_name, config):
-        """Get variables mapping config value to template variable values
-           according to OS config metadata."""
-        # TODO db api needs to implement this function.
-        os_config_metadata = db_api.adapter.get_os_metadata(adapter_name)
-        vars_dict = {}
-        self._Installer._get_template_vars_from_metadata(os_config_metadata,
-                                                         config,
-                                                         vars_dict)
-        return vars_dict
 
     @classmethod
     def register(cls, installer):
@@ -121,17 +111,6 @@ class PKInstaller(Installer):
     """Interface for package installer."""
     NAME = 'PKInstaller'
     PK_INSTALLERS = {}
-
-    def _get_template_vars_from_metadata(self, adapter_name, config):
-        """Get Get variables mapping config value to template variable values
-           according to OS config metadata."""
-        # TODO db api needs to implement this function.
-        pk_config_metadata = db_api.adapter.get_package_metadata(adapter_name)
-        vars_dict = {}
-        self._Installer._get_template_vars_from_metadata(pk_config_metadata,
-                                                         config,
-                                                         vars_dict)
-        return vars_dict
 
     def get_target_systems(self):
         """virtual method to get available target_systems for each os.
