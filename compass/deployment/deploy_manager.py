@@ -25,99 +25,41 @@ from compass.utils import util
 
 
 class DeployManager(object):
-    def __init__(self, cluster_id, hosts_id_list, config):
-        self.cluster_id = cluster_id
-        self.hosts_id_list = hosts_id_list
-        self.adapter_info = self._get_adapter_info(cluster_id)
+    def __init__(self, adapter_info, cluster_info, hosts_info):
+        os_installer_name = adapter_info['os_installer']['name']
+        pk_installer_name = adapter_info['pk_installer']['name']
 
-        os_installer_info = self.adapter_info['os_installer']
-        pk_installer_info = self.adapter_info['pk_installer']
-        
-        self.deploy_config = self._get_deploy_config(config)
+        os_hosts_info = self._get_hosts_for_os_installation(hosts_info)
 
-        self.os_installer = self._get_installer(os_installer_info)
-        self.pk_installer = self._get_installer(pk_installer_info)
+        self.os_installer = self._get_installer(os_installer_name,
+                                                adapter_info,
+                                                cluster_info,
+                                                os_hosts_info)
+        self.pk_installer = self._get_installer(pk_installer_name,
+                                                adapter_info,
+                                                cluster_info,
+                                                hosts_info)
 
 
-    def _get_os_installer(self, installer_info):
-        installer_name = installer_info['name']
+    def _get_os_installer(self, installer_name, adapter_info, cluster_info,
+                          hosts_info):
         try:
             installer_class = OSInstaller.get_os_installer(installer_name)
         except Exception as ex:
             raise Exception(ex.message)
 
-        installer = installer_class(installer_info['settings'],
-                                    self.depoly_config)
+        installer = installer_class(adapter_info, cluster_info, hosts_info)
         return installer
 
-    def _get_package_installer(self, installer_info):
-        installer_name = installer_info['name']
+    def _get_package_installer(self, installer_name, adapter_info,
+                               cluster_info, hosts_info):
         try:
             installer_class = PKInstaller.get_package_installer(installer_name)
         except Exception as ex:
             raise Exception(ex.message)
 
-        installer = installer_class(installer_info['settings'],
-                                    self.deploy_config)
+        installer = installer_class(adapter_info, cluster_info, hosts_info)
         return installer
-
-    def _get_deploy_config(self, config):
-        """Generate deloy config based on input config by filling fullname and
-           dns name.
-           The output deploy config format will be:
-           {
-              "cluster": {
-                  "cluster_id": 1,
-                  "cluster_name": "xxx",
-                  "deploy_config": {
-                      "package_config": {
-                          "network_mapping": {
-                            ...  
-                          }  
-                      },
-                      "roles_mapping": {
-                          "controller": {
-                              "management": {
-                                  "interface": "eth0", 
-                                  "ip": "xxx"
-                              },
-                              ....
-                          }
-                      }
-                  }
-              },
-              "hosts": {
-                  1($host_id) :{
-                     "host_id": 1,
-                     "os_version": "CentOS"
-                     "fullname": "xxx",
-                     "dns": "xxx",
-                     "mac_address": "xxxx",
-                     "hostname": "xxx",
-                     "networks": {
-                         "interfaces": {
-                             "eth0":{
-                                 "ip": "xxx",
-                                 "netmask": "xxx",
-                                 "is_mgmt": True
-                             },
-                             ....
-                         }
-                     },
-                     "deploy_config": {
-                         "os_config" :{
-                             .......
-                         },
-                         "package_config": {
-                            ....
-                         } 
-                     }
-                  },
-                  ...
-              }
-           }
-        """
-        pass
 
     def clean_progress(self):
         """Clean previous installation log and progress."""
@@ -138,32 +80,24 @@ class DeployManager(object):
 
     def deploy(self):
         """Deploy the cluster."""
-        adapter_name = self.adapter_info['name']
-        os_installer_config = {}
         if self.pk_installer:
             # generate target system config which will be installed by OS
             # installer right after OS installation is completed.
             pk_instl_conf = self.package_installer.generate_installer_config()
-        
-        if self.os_installer:
-            self.os_installer.set_config(self._get_os_config())
-            os_version = self.adapter_info['os_version']
-            # Send package installer config info to OS installer.
-            if os_installer_config:
-                self.os_installer.set_package_installer_config(pk_instl_conf)
-
-            # start to deploy OS    
-            os_deploy_config = self.os_installer.deploy(os_version)
-            # TODO
-            self.save_os_deploy_config(os_deploy_config)
-
-        if self.package_installer:
-            pk_deploy_config = self.package_installer.deploy(adapter_name)
+            pk_deploy_config = self.package_installer.deploy()
             # TODO
             self.save_pk_deploy_config(pk_deploy_config)
 
+        if self.os_installer:
+            # Send package installer config info to OS installer.
+            if pk_instl_conf:
+                self.os_installer.set_package_installer_config(pk_instl_conf)
 
-            
+            # start to deploy OS
+            os_deploy_config = self.os_installer.deploy()
+            # TODO
+            self.save_os_deploy_config(os_deploy_config)
+
     def redeploy_os(self):
         """Redeploy OS without modifying OS config."""
         if not self.os_installer:
@@ -193,43 +127,14 @@ class DeployManager(object):
     def reset(self):
         pass
 
-    def _get_adapter_info(self, cluster_id):
-        """Get adapter information. Return a dictionary as below,
-           {
-              "adapter_name": "xxx",
-              "roles": [...],
-              "metadata": {
-                  "os_config": {
-                      ...  
-                  },
-                  "package_config": {
-                      ...  
-                  }
-              },
-              "os_installer": {
-                  "name": "cobbler",
-                  "settings": {....}
-              },
-              "pk_installer": {
-                  "name": "chef",
-                  "settings": {....}
-              }
-           }
-        """
-        pass
-
-    def _get_hosts_for_os_installation(self):
-        os_needed_hosts = {}
-        hosts = self.deploy_config["hosts"]
-        for host_id in hosts:
-            os_installed_flag = hosts[host_id]["os_installed"]
-            reinstall_os_flag = hosts[host_id]["reinstall_os"]
+    def _get_hosts_for_os_installation(self, hosts_info):
+        hosts_list = {}
+        for host_id in hosts_info:
+            os_installed_flag = hosts_info[host_id]["os_installed"]
+            reinstall_os_flag = hosts_info[host_id]["reinstall_os"]
             if os_installed_flag and not reinstall_os_flag:
                 continue
-            
-            os_needed_hosts[host_id] = hosts[host_id]
 
-        return os_needed_hosts
+            hosts_list[host_id] = hosts_info[host_id]
 
-
-
+        return hosts_list

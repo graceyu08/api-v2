@@ -24,6 +24,7 @@ class BaseConfigManager(object):
     DEPLOY_CONFIG = 'deploy_config'
     OS_CONFIG = 'os_config'
     PK_CONFIG = 'package_config'
+    NETWORK_MAPPING = 'network_mapping'
     ROLES_MAPPING = 'roles_mapping'
     HOST_ID = 'host_id'
     OS_INSTALLED_FLAG = 'os_installed'
@@ -78,14 +79,39 @@ class BaseConfigManager(object):
         return self.hosts_info.keys()
 
     def get_cluster_os_config(self):
-        pass
+        if not self.cluster_info:
+            logging.info("cluster config is None or {}")
+            return None
+
+        return self.cluster_info[self.OS_CONFIG]
 
     def get_cluster_package_config(self):
         if not self.cluster_info:
             logging.info("cluster config is None or {}")
             return None
 
-        return self.cluster_info[self.DEPLOY_CONFIG][self.PK_CONFIG]
+        return self.cluster_info[self.PK_CONFIG]
+
+    def get_cluster_network_mapping(self):
+        package_config = self.get_cluster_package_config()
+        if not package_config:
+            logging.info("cluster package_config is None or {}.")
+            return None
+
+        if self.NETWORK_MAPPING not in package_config:
+            return None
+
+        return package_config[self.NETWORK_MAPPING]
+
+    def get_cluster_deploy_config(self):
+        if not self.cluster_info:
+            logging.info("cluster config is None or {}")
+            return None
+
+        if self.DEPLOY_CONFIG in self.cluster_info:
+            self.cluster_info.setdefault(self.DEPLOY_CONFIG, {})
+
+        return self.cluster_info[self.DEPLOY_CONFIG]
 
     def get_cluster_roles_mapping(self):
         if not self.cluster_info:
@@ -93,8 +119,8 @@ class BaseConfigManager(object):
             return None
 
         if self.ROLES_MAPPING not in self.cluster_info[self.DEPLOY_CONFIG]:
-            logging.info("No 'roles_mapping' found in the cluster config!")
-            return None
+            mapping = self._get_roles_mapping_helper()
+            self.cluster_info[self.DEPLOY_CONFIG][self.ROLES_MAPPING] = mapping
 
         return self.cluster_info[self.DEPLOY_CONFIG][self.ROLES_MAPPING]
 
@@ -227,3 +253,44 @@ class BaseConfigManager(object):
 
     def get_pk_config_meatadata(self):
         return self.adapter_info[self.METADATA][self.PK_CONFIG]
+
+    def _get_roles_mapping_helper(self):
+        """The ouput format will be as below, for example:
+           {
+               "controller": [
+                   {
+                       "management": {
+                           "interface": "eth0",
+                           "ip": "192.168.1.10",
+                           "netmask": "255.255.255.0"
+                       },
+                       ...
+                   },
+                   ...
+               ],
+               ....
+           }
+        """
+        mapping = {}
+        hosts_id_list = self.get_host_id_list()
+        network_mapping = self.get_cluster_network_mapping()
+        if not network_mapping:
+            return None
+
+        for host_id in hosts_id_list:
+            temp = {}
+            host_roles = self.get_host_roles()
+            interfaces = self.get_host_interfaces(host_id)
+            for key in network_mapping:
+                nic = network_mapping[key]["interface"]
+                if nic in interfaces:
+                    temp[key]["interface"] = nic
+                    temp[key]["ip"] = self.get_host_interface_ip(host_id, nic)
+                    temp[key]["netmask"] = self.get_host_interface_netmask(
+                                           host_id, nic)
+            for role in host_roles:
+                if role not in mapping:
+                    mapping.setdefault(role, [])
+                mapping[role].append(temp)
+        
+        return mapping       

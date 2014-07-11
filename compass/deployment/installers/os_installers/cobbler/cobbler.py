@@ -32,6 +32,8 @@ class CobblerInstaller(OSInstaller):
     USERNAME = 'username'
     PASSWORD = 'password'
     INSTALLER_URL = "cobbler_url"
+    TMPL_DIR = 'tmpl_dir'
+    SYS_TMPL = 'system.tmpl'
 
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(CobblerInstaller, self).__init__()
@@ -42,6 +44,7 @@ class CobblerInstaller(OSInstaller):
             username = installer_settings[self.CREDENTIALS][self.USERNAME]
             password = installer_settings[self.CREDENTIALS][self.PASSWORD]
             cobbler_url = installer_settings[self.INSTALLER_URL]
+            self.tmpl_dir = installer_settings[self.TMPL_DIR]
         except KeyError as ex:
             raise KeyError(ex.message)
 
@@ -95,20 +98,10 @@ class CobblerInstaller(OSInstaller):
         logging.debug('sync %s', self)
         os.system('service rsyslog restart')
 
-    def _get_updated_system_config(self, fullname, profile, config):
+    def _get_system_config(self, vars_dicts):
         """get updated system config."""
-        system_config = {
-            'name': fullname,
-            'hostname': fullname,
-            'profile': profile,
-        }
-
-        translated_config = self.mapping.TO_HOST_TRANSLATOR.translate(config)
-        util.merge_dict(system_config, translated_config)
-
-        ksmeta = system_config.setdefault('ksmeta', {})
-        if config['pk_installer']:
-            util.merge_dict(ksmeta, config['pk_installer'])
+        os_version = self.config_manager.get_os_version()
+        system_tmpl = os.path.join(self.tmpl_dir, os_version)
 
         return system_config
 
