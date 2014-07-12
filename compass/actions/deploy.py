@@ -17,9 +17,8 @@
 import logging
 
 from compass.actions import util
-from compass.config_management.utils.config_manager import ConfigManager
-from compass.db import database
-
+from compass.db import db_api
+from compass.deployment.deploy_manager import DeployManager
 
 def deploy(cluster_id, hosts_id_list):
     """Deploy clusters.
@@ -34,14 +33,32 @@ def deploy(cluster_id, hosts_id_list):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
-        logging.debug('deploy cluster_hosts: %s', cluster_hosts)
-        with database.session():
-            cluster_hosts, os_versions, target_systems = (
-                util.update_cluster_hosts(cluster_hosts))
-            manager = ConfigManager()
-            manager.install_cluster_and_hosts(
-                cluster_hosts, os_versions, target_systems)
-            manager.sync()
+        adapter_info = _get_adapter_info(cluster_id)
+        cluster_info = _get_cluster_info(cluster_id)
+        hosts_info = _get_hosts_info(hosts_id_list)
+
+        deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
+        deploy_manager.prepare_for_deploy()
+        deploy_manager.deploy()
+
+
+def redeploy(cluster_id, hosts_id_list):
+    """Deploy clusters.
+
+    :param cluster_hosts: clusters and hosts in each cluster to deploy.
+    :type cluster_hosts: dict of int or str to list of int or str
+    """
+    with util.lock('serialized_action') as lock:
+        if not lock:
+            raise Exception('failed to acquire lock to deploy')
+
+        adapter_info = _get_adapter_info(cluster_id)
+        cluster_info = _get_cluster_info(cluster_id, redeploy=True)
+        hosts_info = _get_hosts_info(hosts_id_list, redeploy=True)
+
+        deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
+        deploy_manager.prepare_for_deploy()
+        deploy_manager.redeploy()
 
 def _get_adapter_info(cluster_id):
         """Get adapter information. Return a dictionary as below,
@@ -68,10 +85,10 @@ def _get_adapter_info(cluster_id):
         """
         pass
 
-def _get_cluster_info(cluster_id):
+def _get_cluster_info(cluster_id, redeploy=False):
     """Get cluster information."""
     pass
 
-def _get_hosts_info(self, hosts_id_list):
+def _get_hosts_info(self, hosts_id_list, redeploy=False):
     """Get hosts information."""
     pass

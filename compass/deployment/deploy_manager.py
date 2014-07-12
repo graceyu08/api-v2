@@ -98,16 +98,22 @@ class DeployManager(object):
             # TODO
             self.save_os_deploy_config(os_deploy_config)
 
-    def redeploy_os(self):
-        """Redeploy OS without modifying OS config."""
-        if not self.os_installer:
-            raise Exception("No OS installer found!")
-        os_config = self._get_os_config(redeploy=True)
-        self.os_installer.redeploy(os_config)
-
-    def redeploy_target_system(self):
-        """Redeploy the target system without modifying package config."""
+    def save_pk_deploy_config(self, packge_deploy_config):
+        """Save package config to DB"""
+        # Sava cluster package config to cluster deploy config column
+        # Save each host package config to host deploy config column
         pass
+
+    def save_os_deploy_config(self, os_deploy_config):
+        """Save each host's OS deploy config to its deploy config column."""
+        pass
+
+    def redeploy(self):
+        if self.os_installer:
+            self.os_installer.redeploy()
+
+        if self.package_installer:
+            self.package_installer.redeploy()
 
     def remove_hosts(self):
         """Remove hosts from both OS and package installlers server side."""
@@ -128,6 +134,7 @@ class DeployManager(object):
         pass
 
     def _get_hosts_for_os_installation(self, hosts_info):
+        """Get info of hosts which need to install/reinstall OS."""
         hosts_list = {}
         for host_id in hosts_info:
             os_installed_flag = hosts_info[host_id]["os_installed"]

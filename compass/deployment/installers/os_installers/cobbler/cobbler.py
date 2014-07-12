@@ -15,10 +15,12 @@
 """os installer cobbler plugin.
 """
 import logging
-import os.path
+import os
 import shutil
+import simplejson as json
 import xmlrpclib
 
+from Cheetah.Template import Template
 from compass.deployment.installers.config_manager import BaseConfigManager
 from compass.deployment.installers.installer import OSInstaller
 from compass.utils import setting_wrapper as setting
@@ -34,6 +36,8 @@ class CobblerInstaller(OSInstaller):
     INSTALLER_URL = "cobbler_url"
     TMPL_DIR = 'tmpl_dir'
     SYS_TMPL = 'system.tmpl'
+    SYS_TMPL_NAME = 'system.tmpl'
+    PROFILE = 'profile'
 
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(CobblerInstaller, self).__init__()
@@ -80,12 +84,14 @@ class CobblerInstaller(OSInstaller):
            install OS.
         """
         os_version = self.config_manager.get_os_version()
+        profile = self._get_profile_from_server(os_version)
         host_ids = self.config_manager.get_host_id_list()
         for host_id in host_ids:
             fullname = self.config_manager.get_host_fullname(host_id)
+            vars_dict = self._get_tmpl_vars_dict(host_id, fullname=fullname,
+                                                 profile=profile)
 
-            self.update_host_os_config_to_server(host_id, fullname,
-                                                 host_config, os_version)
+            self.update_host_os_config_to_server(host_id, fullname, vars_dict)
         # sync to cobbler and trigger installtion.
         self._sync()
 
@@ -98,10 +104,19 @@ class CobblerInstaller(OSInstaller):
         logging.debug('sync %s', self)
         os.system('service rsyslog restart')
 
-    def _get_system_config(self, vars_dicts):
+    def _get_system_config(self, vars_dict):
         """get updated system config."""
         os_version = self.config_manager.get_os_version()
-        system_tmpl = os.path.join(self.tmpl_dir, os_version)
+        system_tmpl_file = os.path.join(os.path.join(self.tmpl_dir, os_version),
+                                   self.SYS_TMPL_NAME)
+        system_tmpl = Template(file=system_tmpl_file, searchList=[vars_dict])
+        system_config = json.loads(system_tmpl.respond())
+
+        # update package config info to ksmeta
+        if self.pk_installer_config:
+            ksmeta = system_config.setdefault("ksmeta", {})
+            util.merge_dict(ksmeta, self.pk_installer_config)
+            system_config["ksmeta"] = ksmeta
 
         return system_config
 
@@ -174,14 +189,11 @@ class CobblerInstaller(OSInstaller):
 
         self._sync()
 
-    def update_host_os_config_to_server(self, host_id, fullname,
-                                        host_config, os_version):
+    def update_host_os_config_to_server(self, host_id, fullname, vars_dict):
         """update host config and upload to cobbler server."""
-        profile = self._get_profile_from_server(os_version)
         sys_id = self._get_system_id(fullname)
 
-        system_config = self._get_updated_system_config(fullname, profile,
-                                                        host_config)
+        system_config = self._get_system_config(vars_dict)
         logging.debug('%s system config to update: %s', host_id, system_config)
 
         self._update_system_config(sys_id, system_config)
@@ -199,6 +211,36 @@ class CobblerInstaller(OSInstaller):
         except Exception as ex:
             logging.info("Deleting host got exception: %s", ex.message)
 
+    def _get_tmpl_vars_dict(self, host_id, **kwargs):
+        vars_dict = {}
+        fullname = None
+        if self.FULLNAME in kwargs:
+            fullname = kwargs[self.FULLNAME]
+        else:
+            fullname = self.config_manager.get_host_fullname(host_id)
+
+        if self.PROFILE in kwargs:
+            profile = kwargs[self.PROFILE]
+        else:
+            os_version = self.config_manager.get_os_version()
+            profile = self._get_profile_from_server(os_version)
+        
+        # Set fullname, MAC address and hostname
+        vars_dict[self.FULLNAME] = fullname
+        vars_dict[self.MAC_ADDR] = self.config_manager.get_host_mac_address(
+                                   host_id)
+        vars_dict[self.HOSTNAME] = self.config_manager.get_hostname(host_id)
+        vars_dict[self.PROFILE] = profile
+
+        os_config_metadata = self.config_manager.get_os_config_metadata()
+        host_os_config = self.config_manager.get_host_os_config(host_id)
+
+        # Get template variables values from metadata
+        temp_vars_dict = self.get_tmpl_vars_from_metadata(os_config_metadata,
+                                                          host_os_config)
+        util.merge_dict(vars_dict, temp_vars_dict)
+
+        return {'host': vars_dict}
 
 OSInstaller.register(CobblerInstaller)
 
