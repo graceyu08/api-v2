@@ -1,0 +1,14 @@
+
+33.33.33.35   ws-chef-server.local.lan ws-chef-server
+33.33.33.36   ws-workstation.local.lan ws-workstation
+33.33.33.38   g-compass-dev.local.lan   g-compass-dev
+33.33.33.39   ws-compass-dev.local.lan ws-compass-dev
+
+33.33.33.20   ws-controller.local.lan  ws-controller
+33.33.33.21   ws-compute.local.lan     ws-compute
+33.33.33.22   ws-network.local.lan     ws-network
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters

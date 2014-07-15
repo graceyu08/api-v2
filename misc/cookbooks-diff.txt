@@ -1,0 +1,325 @@
+/home/ubuntu/chef-repo/cookbooks/openstack-block-storage
+diff --git a/recipes/api.rb b/recipes/api.rb
+index e6483ca..f902bc2 100644
+--- a/recipes/api.rb
++++ b/recipes/api.rb
+@@ -50,6 +50,8 @@ directory ::File.dirname(node['openstack']['block-storage']['api']['auth']['cach
+ end
+ 
+ service 'cinder-api' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['cinder_api_service']
+   supports status: true, restart: true
+   action :enable
+diff --git a/recipes/scheduler.rb b/recipes/scheduler.rb
+index e8753fb..09c9cec 100644
+--- a/recipes/scheduler.rb
++++ b/recipes/scheduler.rb
+@@ -41,6 +41,8 @@ node['openstack']['db']['python_packages'][db_type].each do |pkg|
+ end
+ 
+ service 'cinder-scheduler' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['cinder_scheduler_service']
+   supports status: true, restart: true
+   action [:enable, :start]
+diff --git a/recipes/volume.rb b/recipes/volume.rb
+index e0c5821..34138d6 100644
+--- a/recipes/volume.rb
++++ b/recipes/volume.rb
+@@ -181,6 +181,8 @@ when 'cinder.volume.drivers.lvm.LVMISCSIDriver'
+     end
+ 
+     service 'cinder-group-active' do
++      provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+       service_name 'cinder-group-active'
+ 
+       action [:enable, :start]
+@@ -208,6 +210,8 @@ when 'cinder.volume.drivers.emc.emc_smis_iscsi.EMCSMISISCSIDriver'
+ end
+ 
+ service 'cinder-volume' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['cinder_volume_service']
+   supports status: true, restart: true
+   action [:enable, :start]
+@@ -215,6 +219,8 @@ service 'cinder-volume' do
+ end
+ 
+ service 'iscsitarget' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['cinder_iscsitarget_service']
+   supports status: true, restart: true
+   action :enable
+/home/ubuntu/chef-repo/cookbooks/openstack-common
+/home/ubuntu/chef-repo/cookbooks/openstack-compute
+diff --git a/recipes/api-ec2.rb b/recipes/api-ec2.rb
+index f41e684..269ae9a 100644
+--- a/recipes/api-ec2.rb
++++ b/recipes/api-ec2.rb
+@@ -40,6 +40,8 @@ platform_options['api_ec2_packages'].each do |pkg|
+ end
+ 
+ service 'nova-api-ec2' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['api_ec2_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/api-metadata.rb b/recipes/api-metadata.rb
+index c32652d..3023e8b 100644
+--- a/recipes/api-metadata.rb
++++ b/recipes/api-metadata.rb
+@@ -43,6 +43,8 @@ platform_options['compute_api_metadata_packages'].each do |pkg|
+ end
+ 
+ service 'nova-api-metadata' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['compute_api_metadata_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/api-os-compute.rb b/recipes/api-os-compute.rb
+index 01230fc..9aa9e28 100644
+--- a/recipes/api-os-compute.rb
++++ b/recipes/api-os-compute.rb
+@@ -46,6 +46,8 @@ platform_options['api_os_compute_packages'].each do |pkg|
+ end
+ 
+ service 'nova-api-os-compute' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['api_os_compute_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/compute.rb b/recipes/compute.rb
+index d33afe0..02d3c17 100644
+--- a/recipes/compute.rb
++++ b/recipes/compute.rb
+@@ -75,6 +75,7 @@ directory node['openstack']['compute']['instances_path'] do
+ end
+ 
+ service 'nova-compute' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
+   service_name platform_options['compute_compute_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/conductor.rb b/recipes/conductor.rb
+index eea6fd2..80d2eec 100644
+--- a/recipes/conductor.rb
++++ b/recipes/conductor.rb
+@@ -31,6 +31,8 @@ platform_options['compute_conductor_packages'].each do |pkg|
+ end
+ 
+ service 'nova-conductor' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['compute_conductor_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/nova-cert.rb b/recipes/nova-cert.rb
+index d0e6c73..5595e32 100644
+--- a/recipes/nova-cert.rb
++++ b/recipes/nova-cert.rb
+@@ -31,6 +31,8 @@ platform_options['compute_cert_packages'].each do |pkg|
+ end
+ 
+ service 'nova-cert' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['compute_cert_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/scheduler.rb b/recipes/scheduler.rb
+index b898ffb..edbb9e4 100644
+--- a/recipes/scheduler.rb
++++ b/recipes/scheduler.rb
+@@ -32,6 +32,8 @@ platform_options['compute_scheduler_packages'].each do |pkg|
+ end
+ 
+ service 'nova-scheduler' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['compute_scheduler_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+diff --git a/recipes/vncproxy.rb b/recipes/vncproxy.rb
+index ea32cc4..332b0b3 100644
+--- a/recipes/vncproxy.rb
++++ b/recipes/vncproxy.rb
+@@ -41,6 +41,8 @@ end
+ proxy_service = platform_options['compute_vncproxy_service']
+ 
+ service proxy_service do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name proxy_service
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+@@ -49,6 +51,8 @@ service proxy_service do
+ end
+ 
+ service 'nova-consoleauth' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['compute_vncproxy_consoleauth_service']
+   supports status: true, restart: true
+   subscribes :restart, resources('template[/etc/nova/nova.conf]')
+/home/ubuntu/chef-repo/cookbooks/openstack-dashboard
+/home/ubuntu/chef-repo/cookbooks/openstack-identity
+diff --git a/recipes/server.rb b/recipes/server.rb
+index 0f8f651..60bbb1e 100644
+--- a/recipes/server.rb
++++ b/recipes/server.rb
+@@ -63,6 +63,8 @@ execute 'Keystone: sleep' do
+ end
+ 
+ service 'keystone' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['keystone_service']
+   supports status: true, restart: true
+ 
+/home/ubuntu/chef-repo/cookbooks/openstack-image
+diff --git a/recipes/api.rb b/recipes/api.rb
+index 8bc9232..8fcf100 100644
+--- a/recipes/api.rb
++++ b/recipes/api.rb
+@@ -86,6 +86,8 @@ elsif node['openstack']['image']['api']['default_store'] == 'rbd'
+ end
+ 
+ service 'glance-api' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['image_api_service']
+   supports status: true, restart: true
+ 
+diff --git a/recipes/registry.rb b/recipes/registry.rb
+index 465c9b1..6423350 100644
+--- a/recipes/registry.rb
++++ b/recipes/registry.rb
+@@ -76,6 +76,8 @@ directory ::File.dirname(node['openstack']['image']['registry']['auth']['cache_d
+ end
+ 
+ service 'glance-registry' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['image_registry_service']
+   supports status: true, restart: true
+ 
+/home/ubuntu/chef-repo/cookbooks/openstack-network
+diff --git a/recipes/common.rb b/recipes/common.rb
+index a0df85d..b06d416 100644
+--- a/recipes/common.rb
++++ b/recipes/common.rb
+@@ -141,6 +141,8 @@ end
+ # and not the api server components, so we ignore restart
+ # failures here as there may be no neutron-server process
+ service 'neutron-server' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_server_service']
+   supports status: true, restart: true
+   ignore_failure true
+diff --git a/recipes/dhcp_agent.rb b/recipes/dhcp_agent.rb
+index 623da8b..8007f42 100644
+--- a/recipes/dhcp_agent.rb
++++ b/recipes/dhcp_agent.rb
+@@ -34,6 +34,8 @@ platform_options['neutron_dhcp_packages'].each do |pkg|
+ end
+ 
+ service 'neutron-dhcp-agent' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_dhcp_agent_service']
+   supports status: true, restart: true
+ 
+diff --git a/recipes/l3_agent.rb b/recipes/l3_agent.rb
+index e3a50e6..27a15dd 100644
+--- a/recipes/l3_agent.rb
++++ b/recipes/l3_agent.rb
+@@ -36,6 +36,8 @@ platform_options['neutron_l3_packages'].each do |pkg|
+ end
+ 
+ service 'neutron-l3-agent' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_l3_agent_service']
+   supports status: true, restart: true
+ 
+diff --git a/recipes/metadata_agent.rb b/recipes/metadata_agent.rb
+index 0ad8021..10ab38e 100644
+--- a/recipes/metadata_agent.rb
++++ b/recipes/metadata_agent.rb
+@@ -50,6 +50,8 @@ platform_options['neutron_metadata_agent_packages'].each do |pkg|
+ end
+ 
+ service 'neutron-metadata-agent' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_metadata_agent_service']
+   supports status: true, restart: true
+   action :enable
+diff --git a/recipes/openvswitch.rb b/recipes/openvswitch.rb
+index da86402..08760b1 100644
+--- a/recipes/openvswitch.rb
++++ b/recipes/openvswitch.rb
+@@ -77,6 +77,8 @@ if platform_family?('debian')
+ end
+ 
+ service 'neutron-openvswitch-switch' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_openvswitch_service']
+   supports status: true, restart: true
+   action [:enable, :start]
+@@ -84,6 +86,8 @@ end
+ 
+ if node.run_list.expand(node.chef_environment).recipes.include?('openstack-network::server')
+   service 'neutron-server' do
++    provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+     service_name platform_options['neutron_server_service']
+     supports status: true, restart: true
+     action :nothing
+@@ -118,6 +122,8 @@ template '/etc/neutron/plugins/openvswitch/ovs_neutron_plugin.ini' do
+ end
+ 
+ service 'neutron-plugin-openvswitch-agent' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_openvswitch_agent_service']
+   supports status: true, restart: true
+   action :enable
+@@ -171,6 +177,8 @@ if node['openstack']['network']['disable_offload']
+   end
+ 
+   service 'disable-eth-offload' do
++    provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+     supports restart: false, start: true, stop: false, reload: false
+     priority(
+       2 => [:start, 19]
+diff --git a/recipes/server.rb b/recipes/server.rb
+index a83ac0a..3268278 100644
+--- a/recipes/server.rb
++++ b/recipes/server.rb
+@@ -59,6 +59,8 @@ EOF
+ end
+ 
+ service 'neutron-server' do
++  provider Chef::Provider::Service::Upstart if platform?("ubuntu") && node["platform_version"].to_f >= 13.10
++
+   service_name platform_options['neutron_server_service']
+   supports status: true, restart: true
+   action [:enable, :start]
+/home/ubuntu/chef-repo/cookbooks/openstack-object-storage
+/home/ubuntu/chef-repo/cookbooks/openstack-ops-database
+/home/ubuntu/chef-repo/cookbooks/openstack-ops-messaging
+/home/ubuntu/chef-repo/cookbooks/openstack-orchestration
+/home/ubuntu/chef-repo/cookbooks/openstack-telemetry
