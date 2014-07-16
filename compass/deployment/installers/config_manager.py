@@ -135,7 +135,6 @@ class BaseConfigManager(object):
 
         return self.hosts_info[host_id]
 
-
     def get_host_fullname(self, host_id):
         if not self._get_host_info(host_id):
             return None
@@ -174,13 +173,20 @@ class BaseConfigManager(object):
         host_info = self._get_host_info(host_id)
         return host_info[self.HOSTNAME]
 
+    def get_host_networks(self, host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
+            return None
+        
+        return host_info[self.NETWORKS]
+
     def get_host_interfaces(self, host_id):
-        if not self._get_host_info(host_id):
+        interfaces = self.get_host_networks(host_id)
+        if not interfaces:
             return None
 
-        host_info = self._get_host_info(host_id)
-        nics = host_info[self.NETWORKS][self.INTERFACES]
-        return nics.keys()
+        nic_names = interfaces.keys()
+        return nic_names
 
     def _get_host_interface_config(self, host_id, interface):
         if not self._get_host_info(host_id):
@@ -213,7 +219,7 @@ class BaseConfigManager(object):
             return None
 
         host_info = self._get_host_info(host_id)
-        return host_info[self.DEPLOY_CONFIG][self.OS_CONFIG]
+        return host_info[self.OS_CONFIG]
 
     def get_host_domain(self, host_id):
         os_config = self.get_host_os_config(host_id)
@@ -227,7 +233,7 @@ class BaseConfigManager(object):
             return None
 
         host_info = self._get_host_info(host_id)
-        return host_info[self.DEPLOY_CONFIG][self.PK_CONFIG]
+        return host_info[self.PK_CONFIG]
 
     def get_host_roles(self, host_id):
         host_pk_config = self._get_host_info(host_id)

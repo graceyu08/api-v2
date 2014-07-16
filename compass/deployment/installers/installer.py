@@ -14,6 +14,7 @@
 
 """Module to provider installer interface.
 """
+from copy import deepcopy
 import logging
 
 
@@ -45,21 +46,36 @@ class Installer(object):
         return template_vars
 
     def _get_tmpl_vars_helper(self, metadata, config, output):
-        if isinstance(config, dict):
-            for key in config:
+        for key in config:
+            config_value = config[key]
+            if key in metadata:
                 sub_meta = metadata[key]
-                sub_config = config[key]
-                if "_self" in sub_meta and sub_meta['_self']['mapping_to']:
-                    tmpl_var = sub_meta['_self']['mapping_to']
-                    output[tmpl_var] = {}
-                    self._get_tmpl_vars_helper(sub_meta, sub_config,
-                                               output[tmpl_var])
+                if sub_meta['_self']['mapping_to']:
+                    mapping_to = sub_meta['_self']['mapping_to']
+                    if isinstance(config_value, dict):
+                        output[mapping_to] = {}
+                        self._get_tmpl_vars_helper(sub_meta, config_value,
+                                                   output[mapping_to])
+                    else:
+                        output[mapping_to] = config[key]
+                elif isinstance(config_value, dict):
+                    self._get_tmpl_vars_helper(sub_meta, config_value,
+                                               output)
+            else:
+                temp = deepcopy(metadata)
+                del temp['_self']
+                meta_key = temp.keys()[0]
+                if meta_key.startswith("$"):
+                    sub_meta = metadata[meta_key]
+                    if isinstance(config_value, dict):
+                        output[key] = {}
+                        self._get_tmpl_vars_helper(sub_meta, config_value,
+                                                       output[key])
+                    else:
+                        output[key] = config_value
                 else:
-                    self._get_tmpl_vars_helper(sub_meta, sub_config, output)
+                    raise KeyError("'%s' is an invalid metadata!", key)
 
-        elif isinstance(config, str) and metadata['mapping_to']:
-            tmpl_var = metadata['mapping_to']
-            output[tmpl_var] = config
 
     @classmethod
     def register(cls, installers_dict, installer):

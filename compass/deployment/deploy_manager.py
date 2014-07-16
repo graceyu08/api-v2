@@ -31,14 +31,14 @@ class DeployManager(object):
 
         os_hosts_info = self._get_hosts_for_os_installation(hosts_info)
 
-        self.os_installer = self._get_installer(os_installer_name,
-                                                adapter_info,
-                                                cluster_info,
-                                                os_hosts_info)
-        self.pk_installer = self._get_installer(pk_installer_name,
-                                                adapter_info,
-                                                cluster_info,
-                                                hosts_info)
+        self.os_installer = self._get_os_installer(os_installer_name,
+                                                   adapter_info,
+                                                   cluster_info,
+                                                   os_hosts_info)
+        self.pk_installer = self._get_package_installer(pk_installer_name,
+                                                        adapter_info,
+                                                        cluster_info,
+                                                        hosts_info)
 
 
     def _get_os_installer(self, installer_name, adapter_info, cluster_info,

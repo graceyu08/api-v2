@@ -38,6 +38,8 @@ class CobblerInstaller(OSInstaller):
     SYS_TMPL = 'system.tmpl'
     SYS_TMPL_NAME = 'system.tmpl'
     PROFILE = 'profile'
+    NETWORKS = 'networks'
+    DNS = 'dns'
 
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(CobblerInstaller, self).__init__()
@@ -53,8 +55,9 @@ class CobblerInstaller(OSInstaller):
             raise KeyError(ex.message)
 
         # the connection is created when cobbler installer is initialized.
-        self.remote_ = xmlrpclib.Server(cobbler_url, allow_none=True)
-        self.token_ = self.remote_.login(username, password)
+        self.remote_ = self._get_cobbler_server(cobbler_url)
+        self.token_ = self._get_token(username, password)
+        self.pk_installer_config = None
 
         logging.debug('%s instance created', self)
 
@@ -62,6 +65,18 @@ class CobblerInstaller(OSInstaller):
         return '%s[name=%s,remote=%s,token=%s' % (
             self.__class__.__name__, self.NAME,
             self.remote_, self.token_)
+
+    def _get_cobbler_server(self, cobbler_url):
+        if not cobbler_url:
+            logging.error("Cobbler URL is None!")
+            raise Exception("Cobbler URL cannot be None!")
+
+        return xmlrpclib.Server(cobbler_url, allow_none=True)
+
+    def _get_token(self, username, password):
+        if self.remote_ is None:
+            raise Exception("Cobbler remote instance is None!")
+        return self.remote_.login(username, password)
 
     def get_supported_oses(self):
         """get supported os versions.
@@ -111,7 +126,6 @@ class CobblerInstaller(OSInstaller):
                                    self.SYS_TMPL_NAME)
         system_tmpl = Template(file=system_tmpl_file, searchList=[vars_dict])
         system_config = json.loads(system_tmpl.respond())
-
         # update package config info to ksmeta
         if self.pk_installer_config:
             ksmeta = system_config.setdefault("ksmeta", {})
@@ -225,12 +239,15 @@ class CobblerInstaller(OSInstaller):
             os_version = self.config_manager.get_os_version()
             profile = self._get_profile_from_server(os_version)
         
-        # Set fullname, MAC address and hostname
+        # Set fullname, MAC address and hostname, networks, and dns
         vars_dict[self.FULLNAME] = fullname
         vars_dict[self.MAC_ADDR] = self.config_manager.get_host_mac_address(
                                    host_id)
         vars_dict[self.HOSTNAME] = self.config_manager.get_hostname(host_id)
         vars_dict[self.PROFILE] = profile
+        vars_dict[self.NETWORKS] = self.config_manager.get_host_networks(
+                                                                  host_id)
+        vars_dict[self.DNS] = self.config_manager.get_host_dns(host_id)
 
         os_config_metadata = self.config_manager.get_os_config_metadata()
         host_os_config = self.config_manager.get_host_os_config(host_id)
