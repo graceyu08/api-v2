@@ -3,41 +3,24 @@
     "hostname": "$host.hostname",
     "profile": "$host.profile",
     "gateway": "$host.gateway",
-    "interfaces": {
+    "interfaces": 
+        #import simplejson
         #set interfaces = $host.networks.interfaces
-        #set $count = len(interfaces)
-        #for $nic in $interfaces
-            "$nic": {
-                "ip_address": "$interfaces[$nic].ip",
-                "netmask": "$interfaces[$nic].netmask",
-                #set $is_mgmt_str=str($interfaces[$nic].is_mgmt).lower()
-                "management": $is_mgmt_str,
-                #if $interfaces[$nic].is_mgmt
-                "mac_address": "$host.mac_address",
-                "dns_name": "$host.dns",
-                #end if
-                "static": true
-            }
-            #if $count > 1
-            ,
+	#set rekeyed = {}
+        #for $nic, $val in $interfaces.iteritems():
+            #set $rekeyed[$nic] = { "ip_address": $val.ip, "netmask": $val.netmask, "management": $val.is_mgmt, "static" : True }
+	    #if $val.is_mgmt:
+	      #set $rekeyed[$nic]["mac_address"] = $host.mac_address
+	      #set $rekeyed[$nic]["dns_name"] = $host.dns
             #end if
-            #set $count = $count - 1
         #end for
-    },
+        #set $str=simplejson.dumps($rekeyed)
+        $str
+    ,
     "ksmeta":{
         "timezone" : "$host.timezone",
-        #set $partition_config = ''
-        #for $path in $host.partition
-            #set $temp=''
-            #set $vol_percentage = $host.partition[$path].vol_percentage
-            #set $vol_size = $host.partition[$path].vol_size
-            #if $vol_percentage
-                #set $temp = $path + ' ' + $vol_percentage + ';'
-            #elif $vol_size
-                #set $temp = $path + ' ' + $vol_size + ';'
-            #end if
-            #set $partition_config = $partition_config + $temp
-        #end for
+	#set f=[(k + ' ' + v['vol_percentage'] or v['vol_size']) for k,v in $host.partition.iteritems()]
+	#set $partition_config = '; '.join($f)
         "partition": "$partition_config"
     }
 }

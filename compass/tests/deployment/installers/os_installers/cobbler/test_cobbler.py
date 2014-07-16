@@ -126,7 +126,7 @@ class TestCobblerInstaller(unittest2.TestCase):
             },
             "ksmeta":{
                 "timezone" : "UTC",
-                "partition": "/var 20%;/home 40%;",
+                "partition": "/var 20%;/home 40%",
                 "chef_url": "https://127.0.0.1",
                 "chef_client_name": "server_01.test",
                 "chef_node_name": "server_01.test",
@@ -143,3 +143,4 @@ class TestCobblerInstaller(unittest2.TestCase):
         output = self.test_cobbler._get_system_config(self.expected_vars_dict)
         self.maxDiff = None
         self.assertEqual(expected_system_config, output)
+
