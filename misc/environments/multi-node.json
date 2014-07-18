@@ -8,207 +8,208 @@
   "default_attributes": {
   },
   "override_attributes": {
-    "mysql": {
-	"bind_address" : "0.0.0.0",
-      "server_root_password": "test",
-      "server_debian_password": "root",
-      "server_repl_password": "root",
-      "allow_remote_root": true,
-      "root_network_acl": "%"
-    },
-    "openstack": {
-      "db" : {
-	  "bind-interface" : "eth1"
+      "mysql": {
+	  "bind_address" : "0.0.0.0",
+	  "server_root_password": "test",
+	  "server_debian_password": "root",
+	  "server_repl_password": "root",
+	  "allow_remote_root": true,
+	  "root_network_acl": "%"
       },
-      "auth": {
-        "validate_certs": false
-      },
-      "identity": {
-        "bind_interface": "eth1"
-      },
-      "mq": {
-        "vhost": "/nova",
-        "network": {
-          "service_type": "rabbitmq"
-        }
-      },
-      "memcached_servers": [
-        "ws-controller:11211"
-      ],
-      "host": "33.33.33.20",
-      "developer_mode": true,
-      "image": {
-        "api": {
-          "bind_interface": "eth1"
-        },
-        "registry": {
-          "bind_interface": "eth1"
-        },
-        "image_upload": true,
-        "upload_images": [
-          "cirros",
-          "ubuntu"
-        ],
-        "upload_image": {
-          "ubuntu": "http://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-amd64-disk1.img",
-          "cirros": "https://launchpad.net/cirros/trunk/0.3.0/+download/cirros-0.3.0-x86_64-disk.img"
-        }
-      },
-      "compute": {
-        "xvpvnc_proxy": {
-          "bind_interface": "eth1"
-        },
-        "novnc_proxy": {
-          "bind_interface": "eth1"
-        },
-        "libvirt": {
-          "virt_type": "qemu"
-        },
-        "network": {
-          "public_interface": "eth3",
-          "service_type": "neutron",
-	    "floating": {
-		"ipv4_cidr" : "192.168.20.0/24"
-	    }
-        },
-        "config": {
-            "ram_allocation_ratio": 5.0
-        }
-      },
-      "network": {
-          "debug": "True",
-          "verbose": "True",
-          "dhcp": {
-            "enable_isolated_metadata": "True"
-          },
-          "metadata": {
-            "nova_metadata_ip": "33.33.33.20"
-          },
-          "openvswitch": {
-            "tunnel_id_ranges": "1:1000",
-            "enable_tunneling": "True",
-            "tenant_network_type": "gre",
-            "local_ip_interface": "eth2"
-          },
-	  "service_plugins" : [ "router" ],
-          "api": {
-            "bind_interface": "eth1"
-          }
-      },
-    "identity" : {
-      "admin_user" : "ksadmin",
-      "bind_interface" : "eth1",
-      "catalog" : {
-        "backend" : "templated"
-      },
-      "debug" : true,
-      "rabbit_server_chef_role" : "os-ops-messaging",
-      "roles" : [
-        "admin",
-        "keystone_admin",
-        "keystone_service_admin",
-        "member",
-        "netadmin",
-        "sysadmin"
-      ],
-      "syslog" : {
-        "use" : false
-      },
-      "tenants" : [
-        "admin",
-        "service",
-        "demo"
-      ],
-      "users" : {
-        "ksadmin" : {
-          "password" : "ksadmin",
-          "default_tenant" : "admin",
-          "roles" : {
-            "admin" : [
-              "admin"
-            ],
-            "keystone_admin" : [
-              "admin"
-            ],
-            "keystone_service_admin" : [
-              "admin"
-            ]
-          }
-        },
-        "demo" : {
-          "password" : "demo",
-          "default_tenant" : "demo",
-          "roles" : {
-            "sysadmin" : [
-              "demo"
-            ],
-            "netadmin" : [
-              "demo"
-            ],
-            "member" : [
-              "demo"
-            ]
-          }
-        }
+      "openstack": {
+	  "auth": {
+              "validate_certs": false
+	  },
+	  "compute": {
+              "xvpvnc_proxy": {
+		  "bind_interface": "eth1"
+              },
+              "novnc_proxy": {
+		  "bind_interface": "eth0"
+              },
+              "libvirt": {
+		  "virt_type": "qemu"
+              },
+              "network": {
+		  "public_interface": "eth3",
+		  "service_type": "neutron"
+              },
+              "config": {
+		  "ram_allocation_ratio": 5.0
+              }
+	  },
+
+	  "db" : {
+	      "bind-interface" : "eth1"
+	  },
+
+	  "identity": {
+              "bind_interface": "eth1"
+	  },
+	  "mq": {
+              "vhost": "/nova",
+              "network": {
+		  "service_type": "rabbitmq"
+              }
+	  },
+	  "memcached_servers": [
+              "ucontroller:11211"
+	  ],
+	  "host": "172.16.1.20",
+	  "developer_mode": true,
+	  "image": {
+              "api": {
+		  "bind_interface": "eth1"
+              },
+              "registry": {
+		  "bind_interface": "eth1"
+              },
+              "image_upload": true,
+              "upload_images": [
+		  "cirros",
+		  "ubuntu"
+              ],
+              "upload_image": {
+		  "ubuntu": "http://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-amd64-disk1.img",
+		  "cirros": "https://launchpad.net/cirros/trunk/0.3.0/+download/cirros-0.3.0-x86_64-disk.img"
+              }
+	  },
+	  "network": {
+              "debug": "True",
+              "verbose": "True",
+              "dhcp": {
+		  "enable_isolated_metadata": "True"
+              },
+              "metadata": {
+		  "nova_metadata_ip": "172.16.1.20"
+              },
+              "openvswitch": {
+		  "tunnel_id_ranges": "1:1000",
+		  "enable_tunneling": "True",
+		  "tenant_network_type": "gre",
+		  "local_ip_interface": "eth2"
+              },
+	      "service_plugins" : [ "router" ],
+              "api": {
+		  "bind_interface": "eth1"
+              }
+	  },
+	  "identity" : {
+	      "admin_user" : "ksadmin",
+	      "bind_interface" : "eth1",
+	      "catalog" : {
+		  "backend" : "templated"
+	      },
+	      "debug" : true,
+	      "rabbit_server_chef_role" : "os-ops-messaging",
+	      "roles" : [
+		  "admin",
+		  "keystone_admin",
+		  "keystone_service_admin",
+		  "member",
+		  "netadmin",
+		  "sysadmin"
+	      ],
+	      "syslog" : {
+		  "use" : false
+	      },
+	      "tenants" : [
+		  "admin",
+		  "service",
+		  "demo"
+	      ],
+	      "users" : {
+		  "ksadmin" : {
+		      "password" : "ksadmin",
+		      "default_tenant" : "admin",
+		      "roles" : {
+			  "admin" : [
+			      "admin"
+			  ],
+			  "keystone_admin" : [
+			      "admin"
+			  ],
+			  "keystone_service_admin" : [
+			      "admin"
+			  ]
+		      }
+		  },
+		  "demo" : {
+		      "password" : "demo",
+		      "default_tenant" : "demo",
+		      "roles" : {
+			  "sysadmin" : [
+			      "demo"
+			  ],
+			  "netadmin" : [
+			      "demo"
+			  ],
+			  "member" : [
+			      "demo"
+			  ]
+		      }
+		  }
+	      }
+	  },
+	  
+	  "endpoints": {
+	      "bind-host" : "172.16.1.20",
+	      "block-storage-api" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "block-storage-api-bind" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "compute-api" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "compute-vnc-bind" : {
+		  "host" : "172.16.1.21"
+	      },
+	      "compute-api-bind" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "compute-novnc" : "http://10.145.88.20:6080/vnc_auto.html",
+	      
+	      "compute-novnc-bind" : {
+		  "host" : "10.145.88.20"
+	      },
+              "db": {
+		  "host": "172.16.1.20"
+              },
+	      "identity-admin" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "identity-api" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "identity-bind" : {
+		  "host" : "172.16.1.20"
+	      },
+	      
+	      "image-api" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "image-api-bind" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "image-registry" : {
+		  "host" : "172.16.1.20"
+	      },
+	      "image-registry-bind" : {
+		  "host" : "172.16.1.20"
+	      },
+              "mq": {
+		  "host": "172.16.1.20"
+              },
+	      
+	      "network-api" : {
+		  "host" : "172.16.1.22"
+              },
+	      "network-api-bind" : {
+		  "host" : "172.16.1.22"
+              }
+	  }
       }
-    },
-
-    "endpoints": {
-	"bind-host" : "33.33.33.20",
-	"block-storage-api" : {
-	      "host" : "33.33.33.20"
-	},
-	"block-storage-api-bind" : {
-	      "host" : "33.33.33.20"
-	},
-	"compute-api" : {
-	      "host" : "33.33.33.20"
-	},
-	"compute-api-bind" : {
-	      "host" : "33.33.33.20"
-	},
-	"compute-novnc" : {
-	      "host" : "33.33.33.20"
-	},
-	"compute-novnc-bind" : {
-	      "host" : "33.33.33.20"
-	},
-        "db": {
-          "host": "33.33.33.20"
-        },
-	"identity-admin" : {
-	      "host" : "33.33.33.20"
-	},
-	"identity-api" : {
-	      "host" : "33.33.33.20"
-	},
-	"identity-bind" : {
-	      "host" : "33.33.33.20"
-	},
-
-	"image-api" : {
-	      "host" : "33.33.33.20"
-	},
-	"image-api-bind" : {
-	      "host" : "33.33.33.20"
-	},
-	"image-registry" : {
-	      "host" : "33.33.33.20"
-	},
-	"image-registry-bind" : {
-	      "host" : "33.33.33.20"
-	},
-        "mq": {
-          "host": "33.33.33.20"
-        },
-
-	"network-api" : {
-          "host" : "ws-network"
-        },
-	"network-api-bind" : {
-          "host" : "33.33.33.22"
-        }
-      }
-    }
   }
 }
