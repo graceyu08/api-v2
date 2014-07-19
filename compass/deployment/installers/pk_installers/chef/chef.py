@@ -16,9 +16,7 @@
 import logging
 import os
 import shutil
-import simplejson as json
 
-from Cheetah.Template import Template
 from compass.deployment.installers.config_manager import BaseConfigManager
 from compass.deployment.installers.installer import PKInstaller
 from compass.utils import setting_wrapper as setting
@@ -29,8 +27,11 @@ class ChefInstaller(PKInstaller):
     """chef package installer."""
     NAME = 'chef'
     ENV_TMPL_NAME = 'env.tmpl'
-    NODE_TMPL_NAME = 'node.tmpl'
+    NODE_TMPL_DIR = 'node'
+    COMMON_NODE_TMPL_NAME = 'node.tmpl'
     DATABAGITEM_TMPL_NAME = 'databagitem.tmpl'
+    DEPLOY_PK_CONFIG = 'deploy_package_config'
+    ROLES_MAPPING = 'roles_mapping'
 
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(ChefInstaller, self).__init__()
@@ -39,7 +40,6 @@ class ChefInstaller(PKInstaller):
                                                 hosts_info)
         self.tmpl_dir = self.config_manager.get_target_system_tmpl_dir()
         self.installer_url_ = self.config_manager.get_chef_url()
-        self.databag = self.config_manager.get_databag_name()
         key, client = self.config_manager.get_chef_credentials()
 
         self.api_ = self._get_chef_api(key, client)
@@ -67,6 +67,18 @@ class ChefInstaller(PKInstaller):
 
     def get_env_name(self, adapter_name, cluster_id):
         return "-".join((adapter_name, cluster_id))
+
+    def get_databagitem_name(self):
+        return self.config_manager.get_clustername()
+
+    def get_databag_name(self):
+        return self.config_manager.get_adapter_name()
+
+    def get_databag(self, databag_name):
+        import chef
+        bag = chef.DataBag(databag_name, api=self.api_)
+        bag.save()
+        return bag
 
     def get_node(self, node_name):
         """Get chef node."""
@@ -130,67 +142,129 @@ class ChefInstaller(PKInstaller):
 
         node.save()
 
-    def update_node_attributes(self, node, vars_dict):
-        """Create or update node run_list and environment."""
-
-        node_tmpl_dir = os.path.join(self.tmpl_dir, self.NODE_TMPL_NAME)
+    def _get_node_attributes(self, roles, vars_dict):
+        node_tmpl_dir = os.path.join(self.tmpl_dir, self.NODE_TMPL_DIR)
         if not os.path.exists(node_tmpl_dir):
             logging.info(("No node template found!"
                           "No attributes will be updated!"))
             return
-        node_tmpl = Template(file=node_tmpl_dir, searchList=[vars_dict])
-        node_attr_dict = json.loads(node_tmpl.respond())
 
-        for attr in node_attr_dict:
-            setattr(node, attr, node_attr_dict[attr])
+        node_config = {}
+        #Try to get common config for all nodes
+        node_tmpl = os.path.join(self.tmpl_dir, self.COMMON_NODE_TMPL_NAME)
+        if os.path.exists(node_tmpl):
+            temp_config = self.get_config_from_template(node_tmpl, vars_dict)
+            util.merge_dict(node_config, temp_config)
+
+        for role in roles:
+            node_role_tmpl = os.path.join(node_tmpl_dir,
+                                     ('.'.join((role, 'tmpl'))))
+            if os.path.exists(node_role_tmpl):
+                temp_config = {}
+                temp_config = self.get_config_from_template(node_role_tmpl,
+                                                            vars_dict)
+                util.merge_dict(node_config, temp_config)
+
+        return node_config
+
+    def update_node_attributes(self, node, roles, vars_dict):
+        """Create or update node run_list and environment."""
+
+        node_config = self._get_node_attributes(roles, vars_dict)
+        for attr in node_config:
+            setattr(node, attr, node_config[attr])
 
         node.save()
+
+    def _get_env_attributes(self, vars_dict):
+        env_tmpl = os.path.join(self.tmpl_dir, self.ENV_TMPL_NAME)
+        if not os.path.exists(env_tmpl):
+            logging.info("No environment template is found!!")
+            return
+        env_config = self.get_config_from_template(env_tmpl, vars_dict)
+        return env_config
 
     def update_environment(self, env_name, vars_dict):
         """Generate environment config based on the template file and
            upload it to chef server. Return environment name.
         """
         import chef
-        env_tmpl_file = os.path.join(self.env_dir, env_name)
-        if not os.path.exists(env_tmpl_file):
-            logging.info("No environment template is found!!")
-            return
-
-        env_tmpl = Template(file=env_tmpl_file, searchList=[vars_dict])
-        env_content = json.loads(env_tmpl.respond())
-
+        env_config = self._get_env_attributes(vars_dict)
         env = chef.Environment(env_name, api=self.api_)
-        for attr in env_content:
+        for attr in env_config:
             if attr in env.attributes:
-                setattr(env, attr, env_content[attr])
+                setattr(env, attr, env_config[attr])
         env.save()
 
-    def update_databag(self, vars_dict):
+    def _get_databagitem_attributes(self, vars_dict):
+        databagitem_dir = os.path.join(self.tmpl_dir,
+                                       self.DATABAGITEM_TMPL_NAME)
+        databagitem_config = self.get_config_from_template(databagitem_dir,
+                                                           vars_dict)
+
+        return databagitem_config
+
+    def update_databag(self, databag, item_name, vars_dict):
         """Generate databag config based on the template file and upload
            it to chef server. Return databag name.
         """
-        pass
+        import chef
+        databagitem_config = self._get_databagitem_attributes(vars_dict)
+        databagitem = chef.DataBagItem(databag, item_name, api=self.api_)
 
-    def _get_tmpl_vars(self):
-        pk_metadata = self.config_manager.get_pk_config_meatadata()
-        pk_config = self.config_manager.get_cluster_pk_config()
+        for key, value in databagitem_config.iteritems():
+            databagitem[key] = value
 
-        vars_dict = self.get_tmpl_vars_from_metadata(pk_metadata, pk_config)
-        role_mapping_config = self.config_manager.get_cluster_role_mapping()
+        databagitem.save()
 
-        util.merge_dict(vars_dict, role_mapping_config)
+    def _get_host_tmpl_vars(self, host_id, cluster_vars_dict):
+        """_get_tmpl_vars"""
+        vars_dict = {}
+        host_baseinfo = self.get_host_baseinfo(host_id)
+        util.merge_dict(vars_dict, host_baseinfo)
+
+        pk_config = self.config_manager.get_host_package_config(host_id)
+        host_meta_dict = cluster_vars_dict
+        if pk_config:
+            metadata = self.config_manager.get_pk_config_meatadata()
+            temp_dict = self.get_tmpl_vars_from_metadata(metadata, pk_config)
+            util.merge_dict(host_meta_dict, temp_dict)
+
+        vars_dict[self.DEPLOY_PK_CONFIG] = host_meta_dict
+
+        roles_mapping = self.config_manager.get_host_roles_mapping(host_id)
+        vars_dict[self.DEPLOY_PK_CONFIG][self.ROLES_MAPPING] = roles_mapping
+
         return vars_dict
 
+    def _get_cluster_tmpl_vars(self):
+        vars_dict = {}
+        cluster_baseinfo = self.config_manager.get_cluster_baseinfo()
+        util.merge_dict(vars_dict, cluster_baseinfo)
+
+        pk_metadata = self.config_manager.get_pk_config_meatadata()
+        pk_config = self.config_manager.get_cluster_package_config()
+        meta_dict = self.get_tmpl_vars_from_metadata(pk_metadata, pk_config)
+        vars_dict[self.DEPLOY_PK_CONFIG] = meta_dict
+
+        roles_mapping = self.config_manager.get_cluster_roles_mapping()
+        vars_dict[self.DEPLOY_PK_CONFIG][self.ROLES_MAPPING] = roles_mapping
+        return {'cluster': vars_dict}
 
     def deploy(self):
         """Start to deploy system."""
-        if not self.config:
-            raise Exception("No config for package installer found!")
         adapter_name = self.config_manager.get_adapter_name()
         env_name = self._get_env_name(adapter_name)
 
-        cheetah_search_list = self._get_tmpl_vars()
-        self.update_environment(env_name, cheetah_search_list)
+        global_vars_dict = self._get_cluster_tmpl_vars()
+        #Update environment
+        self.update_environment(env_name, global_vars_dict)
+
+        #Update Databag item
+        databag_name = self.get_databag_name()
+        item_name = self.get_databagitem_name()
+        databag = self.get_databag(databag_name)
+        self.update_databag(databag, item_name, global_vars_dict)
 
         host_list = self.config_manager.get_host_id_list()
         for host_id in host_list:
@@ -200,11 +274,13 @@ class ChefInstaller(PKInstaller):
             node = self.get_node(node_name)
             self.set_node_env(node, env_name)
             self.add_roles(node, roles)
+            vars_dict = self._get_host_tmpl_vars(host_id, global_vars_dict)
+            self.update_node_attributes(node, roles, vars_dict)
 
     def generate_installer_config(self):
         """Render chef config file (client.rb) by OS installing right after
            OS is installed successfully.
-           The output format: 
+           The output format:
            {
               '1'($host_id):{
                   'tool': 'chef',
@@ -252,46 +328,22 @@ class ChefInstaller(PKInstaller):
 
         return target_systems
 
-    def __get_databag_item(self, item_name):
-        """Get compass databag item."""
-        import chef
-        databag = self.__get_compass_databag()
-        databag_items = chef.DataBagItem.list(self.api_)
-        if item_name not in databag_items:
-            logging.info("No item '%s' was found in the databag %s",
-                         item_name, self.compass_databag)
-            return None
-
-        item = chef.DataBagItem(databag, item_name, api=self.api_)
-
-        return item
-
-    def _update_databag_item(self, adapter_name, item_name, config, save=True):
-        """update databag item."""
-        pass
-
-    def _clean_databag_item(self, target_system, bag_item_name):
+    def _clean_databag_item(self, databag, item_name):
         """clean databag item."""
         import chef
-        databag_items = self.tmp_databag_items_.setdefault(
-            target_system, {})
-        if bag_item_name not in databag_items:
-            databag = self._get_databag(target_system)
-            databag_items[bag_item_name] = chef.DataBagItem(
-                databag, bag_item_name, api=self.api_)
+        if item_name not in chef.DataBagItem.list(api=self.api_):
+            logging.info("Databag item '%s' is not found!", item_name)
+            return
 
-        bag_item = databag_items[bag_item_name]
+        bag_item = databag[item_name]
         try:
             bag_item.delete()
-            logging.debug(
-                'databag item %s is removed from target_system %s',
-                bag_item_name, target_system)
+            logging.debug('databag item %s is removed from databag',
+                          item_name)
         except Exception as error:
-            logging.debug(
-                'no databag item %s to delete from target_system %s: %s',
-                bag_item_name, target_system, error)
-
-        del databag_items[bag_item_name]
+            logging.debug('Failed to delete item  %s from databag! Error: %s',
+                          item_name, error)
+        databag.save()
 
     def redeploy(self):
         """reinstall host."""
@@ -302,7 +354,7 @@ PKInstaller.register(ChefInstaller)
 
 
 class ChefConfigManager(BaseConfigManager):
-    TMPL_DIR = 'template_dir'
+    TMPL_DIR = 'tmpl_dir'
     DATABAG_NAME = "databag"
     CHEFSERVER_URL = "chef_server_url"
     KEY_DIR = "key_dir"
@@ -337,11 +389,3 @@ class ChefConfigManager(BaseConfigManager):
             return cred
 
         return (None, None)
-
-    def get_databag_name(self):
-        pk_installer_settings = self.get_pk_installer_settings()
-        if self.DATABAG_NAME not in pk_installer_settings:
-            logging.info("No databag name provided for this adapter!")
-            return None
-
-        return pk_installer_settings[self.DATABAG_NAME]

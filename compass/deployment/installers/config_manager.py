@@ -14,6 +14,8 @@
 
 """Module to manage and access cluster, hosts and adapter config.
 """
+from copy import deepcopy
+from compass.utils import util
 import logging
 
 
@@ -21,7 +23,8 @@ class BaseConfigManager(object):
     CLUSTER_ID = 'cluster_id'
     OS_VERSION = 'os_version'
     CLUSTER_NAME = 'cluster_name'
-    DEPLOY_CONFIG = 'deploy_config'
+    DEPLOY_OS_CONFIG = 'deploy_os_config'
+    DEPLOY_PK_CONFIG = 'deploy_package_config'
     OS_CONFIG = 'os_config'
     PK_CONFIG = 'package_config'
     NETWORK_MAPPING = 'network_mapping'
@@ -35,9 +38,13 @@ class BaseConfigManager(object):
     HOSTNAME = 'hostname'
     NETWORKS = 'networks'
     INTERFACES = 'interfaces'
+    NIC = 'interface'
     IP_ADDR = 'ip'
     NETMASK = 'netmask'
     DOMAIN = 'domain'
+    SUBNET = 'subnet'
+    PROMISCUOUS_FLAG = 'is_promiscuous'
+    MGMT_FLAG = 'is_mgmt'
     ROLES = 'roles'
     OS_CONFIG_GENERAL = 'general'
     ADAPTER_NAME = 'name'
@@ -64,6 +71,19 @@ class BaseConfigManager(object):
             return None
         return self.cluster_info[self.CLUSTER_NAME]
 
+    def get_cluster_baseinfo(self):
+        """Get cluster base information, including cluster_id, os_version,
+           and cluster_name.
+        """
+        if not self.cluster_info:
+            logging.info("cluster config is None or {}")
+            return None
+        base_info = {}
+        base_info[self.CLUSTER_ID] = self.cluster_info[self.CLUSTER_ID]
+        base_info[self.CLUSTER_NAME] = self.cluster_info[self.CLUSTER_NAME]
+        base_info[self.OS_VERSION] = self.cluster_info[self.OS_VERSION]
+        return base_info
+
     def get_os_version(self):
         if not self.cluster_info:
             logging.info("cluster config is None or {}")
@@ -83,14 +103,14 @@ class BaseConfigManager(object):
             logging.info("cluster config is None or {}")
             return None
 
-        return self.cluster_info[self.OS_CONFIG]
+        return deepcopy(self.cluster_info[self.OS_CONFIG])
 
     def get_cluster_package_config(self):
         if not self.cluster_info:
             logging.info("cluster config is None or {}")
             return None
 
-        return self.cluster_info[self.PK_CONFIG]
+        return deepcopy(self.cluster_info[self.PK_CONFIG])
 
     def get_cluster_network_mapping(self):
         package_config = self.get_cluster_package_config()
@@ -101,28 +121,56 @@ class BaseConfigManager(object):
         if self.NETWORK_MAPPING not in package_config:
             return None
 
-        return package_config[self.NETWORK_MAPPING]
+        return deepcopy(package_config[self.NETWORK_MAPPING])
 
-    def get_cluster_deploy_config(self):
+    def get_cluster_deploy_os_config(self):
         if not self.cluster_info:
             logging.info("cluster config is None or {}")
             return None
 
-        if self.DEPLOY_CONFIG in self.cluster_info:
-            self.cluster_info.setdefault(self.DEPLOY_CONFIG, {})
+        if self.DEPLOY_OS_CONFIG not in self.cluster_info:
+            self.cluster_info[self.DEPLOY_OS_CONFIG] = {}
 
-        return self.cluster_info[self.DEPLOY_CONFIG]
+        return self.cluster_info[self.DEPLOY_OS_CONFIG]
+
+    def get_cluster_deploy_package_config(self):
+        if not self.cluster_info:
+            logging.info("cluster config is None or {}")
+            return None
+
+        if self.DEPLOY_PK_CONFIG not in self.cluster_info:
+            self.cluster_info[self.DEPLOY_PK_CONFIG] = {}
+
+        return self.cluster_info[self.DEPLOY_PK_CONFIG]
+
+    def set_cluster_deploy_os_config(self, deploy_os_config):
+        if deploy_os_config is None:
+            return
+
+        config = self.get_cluster_deploy_os_config()
+        util.merge_dict(config, deploy_os_config)
+
+    def set_cluster_deploy_package_config(self, deploy_pk_config):
+        if deploy_pk_config is None:
+            return
+
+        config = self.get_cluster_deploy_package_config()
+        util.merge_dict(config, deploy_pk_config)
 
     def get_cluster_roles_mapping(self):
         if not self.cluster_info:
             logging.info("cluster config is None or {}")
             return None
 
-        if self.ROLES_MAPPING not in self.cluster_info[self.DEPLOY_CONFIG]:
-            mapping = self._get_roles_mapping_helper()
-            self.cluster_info[self.DEPLOY_CONFIG][self.ROLES_MAPPING] = mapping
+        deploy_config = self.get_cluster_deploy_package_config()
 
-        return self.cluster_info[self.DEPLOY_CONFIG][self.ROLES_MAPPING]
+        if self.ROLES_MAPPING not in deploy_config:
+            mapping = self._get_cluster_roles_mapping_helper()
+            deploy_config[self.ROLES_MAPPING] = mapping
+        else:
+            mapping = deploy_config[self.ROLES_MAPPING]
+
+        return mapping
 
     def _get_host_info(self, host_id):
         if not self.hosts_info:
@@ -134,6 +182,29 @@ class BaseConfigManager(object):
             return None
 
         return self.hosts_info[host_id]
+
+    def get_host_baseinfo(self, host_id):
+        """Get host base information."""
+        host_info = self._get_host_info(host_id)
+        if not host_info:
+            return None
+
+        attr_names = [self.OS_INSTALLED_FLAG, self.REINSTALL_OS_FLAG,
+                      self.OS_VERSION, self.MAC_ADDR, self.HOSTNAME,
+                      self.NETWORKS]
+        base_info = {}
+        for attr in attr_names:
+            temp = host_info[attr]
+            if isinstance(temp, dict) or isinstance(temp, list):
+                base_info[attr] = deepcopy(temp)
+            else:
+                base_info[attr] = temp
+
+        base_info[self.HOST_ID] = host_id
+        base_info[self.FULLNAME] = self.get_host_fullname(host_id)
+        base_info[self.DNS] = self.get_host_dns(host_id)
+
+        return base_info
 
     def get_host_fullname(self, host_id):
         if not self._get_host_info(host_id):
@@ -177,49 +248,70 @@ class BaseConfigManager(object):
         host_info = self._get_host_info(host_id)
         if not host_info:
             return None
-        
-        return host_info[self.NETWORKS]
+
+        return deepcopy(host_info[self.NETWORKS])
 
     def get_host_interfaces(self, host_id):
-        interfaces = self.get_host_networks(host_id)
-        if not interfaces:
+        networks = self.get_host_networks(host_id)
+        if not networks:
             return None
 
-        nic_names = interfaces.keys()
+        nic_names = networks[self.INTERFACES].keys()
         return nic_names
 
-    def _get_host_interface_config(self, host_id, interface):
-        if not self._get_host_info(host_id):
+    def get_host_interface_config(self, host_id, interface):
+        networks = self.get_host_networks(host_id)
+        if not networks:
             return None
 
-        host_info = self._get_host_info(host_id)
-
-        if interface not in host_info[self.INTERFACES]:
+        interfaces = networks[self.INTERFACES]
+        if interface not in interfaces:
            logging.info("Cannot find NIC '%s'", interface)
            return None
 
-        return host_info[self.NETWORKS][self.INTERFACES][interface]
+        return deepcopy(interfaces[interface])
 
     def get_host_interface_ip(self, host_id, interface):
         if not self._get_host_interface_config(host_id, interface):
             return None
 
-        interface_config = self._get_host_interface_config(host_id, interface)
+        interface_config = self.get_host_interface_config(host_id, interface)
         return interface_config[self.IP_ADDR]
 
     def get_host_interface_netmask(self, host_id, interface):
-        if not self._get_host_interface_config(host_id, interface):
+        if not self.get_host_interface_config(host_id, interface):
             return None
 
-        interface_config = self._get_host_interface_config(host_id, interface)
+        interface_config = self.get_host_interface_config(host_id, interface)
         return interface_config[self.NETMASK]
+
+    def get_host_interface_subnet(self, host_id, interface):
+        nic_config = self.get_host_interface_config(host_id, interface)
+        if not nic_config:
+            return None
+
+        return nic_config[self.SUBNET]
+
+    def is_interface_promiscuous(self, host_id, interface):
+        nic_config = self.get_host_interface_config(host_id, interface)
+        if not nic_config:
+            raise Exception("Cannot find interface '%s'", interface)
+
+        return nic_config[self.PROMISCUOUS_FLAG]
+
+    def is_interface_mgmt(self, host_id, interface):
+        nic_config = self.get_host_interface_config(host_id, interface)
+        if not nic_config:
+            raise Exception("Cannot find interface '%s'", interface)
+
+        return nic_config[self.MGMT_FLAG]
 
     def get_host_os_config(self, host_id):
         if not self._get_host_info(host_id):
             return None
 
         host_info = self._get_host_info(host_id)
-        return host_info[self.OS_CONFIG]
+        return deepcopy(host_info[self.OS_CONFIG])
 
     def get_host_domain(self, host_id):
         os_config = self.get_host_os_config(host_id)
@@ -228,19 +320,71 @@ class BaseConfigManager(object):
 
         return os_config[self.OS_CONFIG_GENERAL][self.DOMAIN]
 
+    def get_host_network_mapping(self, host_id):
+        package_config = self.get_host_package_config(host_id)
+        if self.NETWORK_MAPPING not in package_config:
+            network_mapping  = self.get_cluster_network_mapping()
+        else:
+            network_mapping = package_config[self.NETWORK_MAPPING]
+
+        return network_mapping
+
     def get_host_package_config(self, host_id):
         if not self._get_host_info(host_id):
             return None
 
         host_info = self._get_host_info(host_id)
-        return host_info[self.PK_CONFIG]
+        return deepcopy(host_info[self.PK_CONFIG])
+
+    def get_host_deploy_os_config(self, host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
+            return None
+
+        if self.DEPLOY_OS_CONFIG not in host_info:
+            host_info[self.DEPLOY_OS_CONFIG] = {}
+
+        return host_info[self.DEPLOY_OS_CONFIG]
+
+    def set_host_deploy_os_config(self, host_id, deploy_config):
+        if deploy_config is None:
+            return
+
+        config = self.get_host_deploy_os_config(host_id)
+        util.merge_dict(config, deploy_config)
+
+    def get_host_deploy_package_config(self, host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
+            return None
+
+        if self.DEPLOY_PK_CONFIG not in host_info:
+            host_info[self.DEPLOY_PK_CONFIG] = {}
+
+        return host_info[self.DEPLOY_PK_CONFIG]
+
+    def set_host_deploy_package_config(self, host_id, deploy_config):
+        if deploy_config is None:
+            return
+        config = self.get_host_deploy_package_config(host_id)
+        util.merge_dict(config, deploy_config)
 
     def get_host_roles(self, host_id):
-        host_pk_config = self._get_host_info(host_id)
+        host_pk_config = self.get_host_package_config(host_id)
         if not host_pk_config:
             return None
 
         return host_pk_config[self.ROLES]
+
+    def get_host_roles_mapping(self, host_id):
+        roles_mapping = {}
+        deployed_pk_config = self.get_host_deploy_package_config(host_id)
+        if self.ROLES_MAPPING not in deployed_pk_config:
+            roles_mapping = self._get_host_roles_mapping_helper(host_id)
+        else:
+            roles_mapping = deployed_pk_config[self.ROLES_MAPPING]
+
+        return roles_mapping
 
     def get_adapter_name(self):
         return self.adapter_info[self.ADAPTER_NAME]
@@ -260,21 +404,21 @@ class BaseConfigManager(object):
     def get_pk_config_meatadata(self):
         return self.adapter_info[self.METADATA][self.PK_CONFIG]
 
-    def _get_roles_mapping_helper(self):
+    def _get_cluster_roles_mapping_helper(self):
         """The ouput format will be as below, for example:
            {
-               "controller": [
-                   {
-                       "management": {
-                           "interface": "eth0",
-                           "ip": "192.168.1.10",
-                           "netmask": "255.255.255.0"
-                       },
-                       ...
+               "controller": {
+                   "management": {
+                       "interface": "eth0",
+                       "ip": "192.168.1.10",
+                       "netmask": "255.255.255.0",
+                       "subnet": "192.168.1.0/24",
+                       "is_mgmt": True,
+                       "is_promiscuous": False
                    },
                    ...
-               ],
-               ....
+               },
+                   ...
            }
         """
         mapping = {}
@@ -284,19 +428,30 @@ class BaseConfigManager(object):
             return None
 
         for host_id in hosts_id_list:
-            temp = {}
-            host_roles = self.get_host_roles()
-            interfaces = self.get_host_interfaces(host_id)
-            for key in network_mapping:
-                nic = network_mapping[key]["interface"]
-                if nic in interfaces:
-                    temp[key]["interface"] = nic
-                    temp[key]["ip"] = self.get_host_interface_ip(host_id, nic)
-                    temp[key]["netmask"] = self.get_host_interface_netmask(
-                                           host_id, nic)
-            for role in host_roles:
+            roles_mapping = self.get_host_roles_mapping(host_id)
+            for role in roles_mapping:
                 if role not in mapping:
-                    mapping.setdefault(role, [])
-                mapping[role].append(temp)
-        
-        return mapping       
+                    mapping[role] = roles_mapping[role]
+
+        return mapping
+
+    def _get_host_roles_mapping_helper(self, host_id):
+        """The format will be the same as cluster roles mapping."""
+        mapping = {}
+        network_mapping = self.get_host_network_mapping(host_id)
+        if not network_mapping:
+            return None
+
+        roles = self.get_host_roles(host_id)
+        interfaces = self.get_host_interfaces(host_id)
+        temp = {}
+        for key in network_mapping:
+            nic = network_mapping[key][self.NIC]
+            if nic in interfaces:
+                temp[key] = self.get_host_interface_config(host_id, nic)
+                temp[key][self.NIC] = nic
+
+        for role in roles:
+            role = role.replace("-", "_")
+            mapping[role] = temp
+        return mapping

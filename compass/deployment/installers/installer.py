@@ -14,8 +14,11 @@
 
 """Module to provider installer interface.
 """
+from Cheetah.Template import Template
 from copy import deepcopy
 import logging
+import os
+import simplejson as json
 
 
 class Installer(object):
@@ -50,7 +53,11 @@ class Installer(object):
             config_value = config[key]
             if key in metadata:
                 sub_meta = metadata[key]
-                if sub_meta['_self']['mapping_to']:
+                try:
+                    mapping_to_value = sub_meta['_self']['mapping_to']
+                except KeyError:
+                    mapping_to_value = None
+                if mapping_to_value:
                     mapping_to = sub_meta['_self']['mapping_to']
                     if isinstance(config_value, dict):
                         output[mapping_to] = {}
@@ -74,7 +81,7 @@ class Installer(object):
                     else:
                         output[key] = config_value
                 else:
-                    raise KeyError("'%s' is an invalid metadata!", key)
+                    raise KeyError("'%s' is an invalid metadata!" % key)
 
 
     @classmethod
@@ -90,13 +97,18 @@ class Installer(object):
 
         installers_dict[installer.NAME] = installer
 
+    def get_config_from_template(self, tmpl_dir, vars_dict):
+        if not os.path.exists(tmpl_dir) or not vars_dict:
+            raise Exception("Template or variables dict is not specified!")
+        tmpl = Template(file=tmpl_dir, searchList=[vars_dict])
+        config = json.loads(tmpl.respond())
+
+        return config
+
 
 class OSInstaller(Installer):
     """Interface for os installer."""
     NAME = 'OSInstaller'
-    FULLNAME = 'fullname'
-    MAC_ADDR = 'mac_address'
-    HOSTNAME = 'hostname'
     OS_INSTALLERS = {}
 
     def get_oses(self):

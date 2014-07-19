@@ -6,7 +6,7 @@
     "interfaces": 
         #import simplejson
         #set interfaces = $host.networks.interfaces
-	#set rekeyed = {}
+	    #set rekeyed = {}
         #for $nic, $val in $interfaces.iteritems():
             #set $rekeyed[$nic] = { "ip_address": $val.ip, "netmask": $val.netmask, "management": $val.is_mgmt, "static" : True }
 	    #if $val.is_mgmt:
@@ -20,7 +20,7 @@
     "ksmeta":{
         "timezone" : "$host.timezone",
 	#set f=[(k + ' ' + v['vol_percentage'] or v['vol_size']) for k,v in $host.partition.iteritems()]
-	#set $partition_config = '; '.join($f)
+	#set $partition_config = ';'.join($f)
         "partition": "$partition_config"
     }
 }

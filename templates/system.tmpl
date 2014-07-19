@@ -1,32 +1,36 @@
 {
     "name": "$host.fullname",
     "hostname": "$host.hostname",
-    "profile": "$profile",
-    "gateway": "$defalut_gateway",
-    "name_servers": "$name_servers",
-    "name_servers_search": "$search_path",
-    "proxy": "$http_proxy",
-    "interfaces": {
-        #for $nic_info in $networks
-        "$nic_info.interface": {
-            "ip_address": "$nic_info.ip",
-            "netmask": "$nic_info.netmask",
-            "management": $nic_info.is_mgmt,
-            #if $nic_info.is_mgmt
-            "mac_address": "$host.mac_address",
-            "dns_name": "$host.dns",
+    "profile": "$host.profile",
+    "gateway": "$host.gateway",
+    "name_servers": "$host.name_servers",
+    "name_servers_search": "$host.search_path",
+    "proxy": "$host.http_proxy",
+    "interfaces":
+        #import simplejson
+        #set interfaces = $host.networks.interfaces
+        #set rekeyed = {}
+        #for $nic, $val in $interfaces.iteritems():
+            #set $rekeyed[$nic] = { "ip_address": $val.ip, "netmask": $val.netmask, "management": $val.is_mgmt, "static" : True }
+        #if $val.is_mgmt:
+          #set $rekeyed[$nic]["mac_address"] = $host.mac_address
+          #set $rekeyed[$nic]["dns_name"] = $host.dns
             #end if
-            "static": True
-        }
         #end for
-    },
+        #set $str=simplejson.dumps($rekeyed)
+        $str
+    ,
     "ksmeta":{
-        "username": "$server_crendentials.username",
-        "password": "$server_crendentials.password",
-        "partition": "$partition",
-        "https_proxy": "$https_proxy",
-        "ignore_proxy": "$ignore_proxy",
-        "ntp_server": "$ntp_server"
+        "username": "$host.server_crendentials.username",
+        #import md5
+        #set $password = md5.new($server_crendentials.password).digest()
+        "password": "$password",
+        #set f=[(k + ' ' + v['vol_percentage'] or v['vol_size']) for k,v in $host.partition.iteritems()]
+        #set $partition_config = '; '.join($f)
+        "partition": "$partition_config",
+        "https_proxy": "$host.https_proxy",
+        "ignore_proxy": "$host.ignore_proxy",
+        "ntp_server": "$host.ntp_server"
     }
 }
 

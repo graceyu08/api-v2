@@ -18,7 +18,6 @@
 
 from copy import deepcopy
 from mock import Mock
-from mock import patch
 import os
 import unittest2
 
@@ -36,27 +35,33 @@ class TestCobblerInstaller(unittest2.TestCase):
     """Test CobblerInstaller methods."""
     def setUp(self):
         super(TestCobblerInstaller, self).setUp()
-        self.set_cobbler_installer()
+        self.test_cobbler = self._get_cobbler_installer()
         self.expected_vars_dict = {
             "host": {
+                "host_id": 1,
                 "mac_address": "mac_01",
                 "fullname": "server_01.test",
                 "profile": "Ubuntu-12.04-x86_64",
                 "hostname": "server_01",
                 "dns": "server_01.test.ods.com",
+                "os_installed": False,
+                "os_version": "Ubuntu-12.04-x86_64",
+                "reinstall_os": False,
                 "networks": {
                     "interfaces": {
-                        "eth0": {
+                        "vnet0": {
                             "ip": "192.168.1.1",
                             "netmask": "255.255.255.0",
                             "is_mgmt": True,
-                            "is_promiscuous": False
+                            "is_promiscuous": False,
+                            "subnet": "192.168.1.0/24"
                         },
-                        "eth1": {
+                        "vnet1": {
                             "ip": "172.16.1.1",
                             "netmask": "255.255.255.0",
                             "is_mgmt": False,
-                            "is_promiscuous": True
+                            "is_promiscuous": True,
+                            "subnet": "172.16.1.0/24"
                         }
                     }
                 },
@@ -80,7 +85,7 @@ class TestCobblerInstaller(unittest2.TestCase):
         super(TestCobblerInstaller, self).tearDown()
         del self.test_cobbler
 
-    def set_cobbler_installer(self):
+    def _get_cobbler_installer(self):
         adapter_info = deepcopy(config_data.adapter_test_config)
         cluster_info = deepcopy(config_data.cluster_test_config)
         hosts_info = deepcopy(config_data.hosts_test_config)
@@ -91,8 +96,7 @@ class TestCobblerInstaller(unittest2.TestCase):
         CobblerInstaller._get_cobbler_server.return_value = "mock_server"
         CobblerInstaller._get_token = Mock()
         CobblerInstaller._get_token.return_value = "mock_token"
-        self.test_cobbler = CobblerInstaller(adapter_info, cluster_info,
-                                             hosts_info)
+        return CobblerInstaller(adapter_info, cluster_info, hosts_info)
 
     def test_get_tmpl_vars_dict(self):
         host_id = 1
@@ -109,7 +113,7 @@ class TestCobblerInstaller(unittest2.TestCase):
             "profile": "Ubuntu-12.04-x86_64",
             "gateway": "192.168.2.1",
             "interfaces": {
-                "eth0": {
+                "vnet0": {
                     "ip_address": "192.168.1.1",
                     "netmask": "255.255.255.0",
                     "management": True,
@@ -117,7 +121,7 @@ class TestCobblerInstaller(unittest2.TestCase):
                     "dns_name": "server_01.test.ods.com",
                     "static": True
                 },
-                "eth1": {
+                "vnet1": {
                     "ip_address": "172.16.1.1",
                     "netmask": "255.255.255.0",
                     "management": False,

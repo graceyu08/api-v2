@@ -3,7 +3,8 @@ import os
 
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 cobbler_system_tmpl_dir = os.path.join(curr_dir, 'templates/cobbler')
-chef_tmpl_dir = os.path.join(curr_dir, 'templates/chef')
+chef_tmpl_dir = os.path.join(os.path.join(curr_dir, 'templates/chef'),
+                             "openstack_icehouse")
 
 adapter_test_config = {
     "name": "openstack_icehouse",
@@ -24,7 +25,8 @@ adapter_test_config = {
         "settings": {
             "chef_server_url": "127.0.0.1",
             "key_dir": "xxx",
-            "client_name": "xxx"
+            "client_name": "xxx",
+            "tmpl_dir": chef_tmpl_dir
         }
     },
     "metadata": {
@@ -74,15 +76,19 @@ adapter_test_config = {
                     "_self": {
                         "mapping_to": "service_credentials"
                     },
-                    "image": {
+                    "rabbit_mq": {
                          "_self": {
-                             "mapping_to": "glance"
+                             "mapping_to": "mq"
                          },
                          "username": {
-                             "mapping_to": "username"
+                             "_self": {
+                                 "mapping_to": "username"
+                             }
                          },
                          "password": {
-                             "mapping_to": "password"
+                             "_self": {
+                                 "mapping_to": "password"
+                             }
                          }
                     }
                 }
@@ -133,10 +139,12 @@ cluster_test_config = {
         }
     },
     "package_config": {
-        "service_credentials": {
-            "image": {
-                "username": "glance",
-                "password": "glance"
+        "security": {
+            "service_credentials": {
+                "rabbit_mq": {
+                    "username": "guest",
+                    "password": "test"
+                }
             }
         },
         "network_mapping": {
@@ -160,17 +168,19 @@ hosts_test_config = {
         "hostname": "server_01",
         "networks": {
             "interfaces": {
-                "eth0": {
+                "vnet0": {
                     "ip": "192.168.1.1",
                     "netmask": "255.255.255.0",
                     "is_mgmt": True,
-                    "is_promiscuous": False
+                    "is_promiscuous": False,
+                    "subnet": "192.168.1.0/24"
                 },
-                "eth1": {
+                "vnet1": {
                     "ip": "172.16.1.1",
                     "netmask": "255.255.255.0",
                     "is_mgmt": False,
-                    "is_promiscuous": True
+                    "is_promiscuous": True,
+                    "subnet": "172.16.1.0/24"
                 }
             }
         },
@@ -193,6 +203,14 @@ hosts_test_config = {
             }
         },
         "package_config": {
+            "network_mapping": {                                                                                                          
+                "management": {                                                    
+                    "interface": "vnet0"                                            
+                },                                                                 
+                "public": {                                                        
+                    "interface": "vnet1"                                            
+                }                                                                  
+            },
             "roles": ["os-controller"]
         }
     },
@@ -209,13 +227,15 @@ hosts_test_config = {
                     "ip": "192.168.1.2",
                     "netmask": "255.255.255.0",
                     "is_mgmt": True,
-                    "is_promiscuous": False
+                    "is_promiscuous": False,
+                    "subnet": "192.168.1.0/24"
                 },
                 "eth1": {
                     "ip": "172.16.1.2",
                     "netmask": "255.255.255.0",
                     "is_mgmt": False,
-                    "is_promiscuous": True
+                    "is_promiscuous": True,
+                    "subnet": "172.16.1.0/24"
                 }
             }
         },
@@ -254,13 +274,15 @@ hosts_test_config = {
                     "ip": "192.168.1.3",
                     "netmask": "255.255.255.0",
                     "is_mgmt": True,
-                    "is_promiscuous": False
+                    "is_promiscuous": False,
+                    "subnet": "192.168.1.0/24"
                 },
                 "eth1": {
                     "ip": "172.16.1.3",
                     "netmask": "255.255.255.0",
                     "is_mgmt": False,
-                    "is_promiscuous": True
+                    "is_promiscuous": True,
+                    "subnet": "172.16.1.0/24"
                 }
             }
         },

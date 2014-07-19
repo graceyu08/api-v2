@@ -17,13 +17,11 @@
 import logging
 import os
 import shutil
-import simplejson as json
 import xmlrpclib
 
-from Cheetah.Template import Template
 from compass.deployment.installers.config_manager import BaseConfigManager
 from compass.deployment.installers.installer import OSInstaller
-from compass.utils import setting_wrapper as setting
+from compass.utils import setting_wrapper as compass_setting
 from compass.utils import util
 
 
@@ -123,9 +121,10 @@ class CobblerInstaller(OSInstaller):
         """get updated system config."""
         os_version = self.config_manager.get_os_version()
         system_tmpl_file = os.path.join(os.path.join(self.tmpl_dir, os_version),
-                                   self.SYS_TMPL_NAME)
-        system_tmpl = Template(file=system_tmpl_file, searchList=[vars_dict])
-        system_config = json.loads(system_tmpl.respond())
+                                        self.SYS_TMPL_NAME)
+        system_config = self.get_config_from_template(system_tmpl_file,
+                                                      vars_dict)
+
         # update package config info to ksmeta
         if self.pk_installer_config:
             ksmeta = system_config.setdefault("ksmeta", {})
@@ -136,7 +135,11 @@ class CobblerInstaller(OSInstaller):
 
     def _get_profile_from_server(self, os_version):
         """get profile name."""
-        profile = self.remote_.find_profile({'name': os_version})[0]
+        result = self.remote_.find_profile({'name': os_version})
+        if not result:
+            raise Exception("Cannot find profile for '%s'", os_version)
+        
+        profile = result[0]
         return profile
 
     def _get_system_id(self, fullname, create_if_not_exists=True):
@@ -181,7 +184,7 @@ class CobblerInstaller(OSInstaller):
     def clean_progress(self):
         """clean log files and config for hosts which to deploy."""
         host_list = self.config_manager.get_host_id_list()
-        log_dir_prefix = setting.INSTALLATION_LOGDIR[self.NAME]
+        log_dir_prefix = compass_setting.INSTALLATION_LOGDIR[self.NAME]
         for host_id in host_list:
             fullname = self.config_manager.get_host_fullname(host_id)
             self._clean_log(log_dir_prefix, fullname)
@@ -219,7 +222,7 @@ class CobblerInstaller(OSInstaller):
            progress.
         """
         try:
-            log_dir_prefix = setting.INSTALLATION_LOGDIR[self.NAME]
+            log_dir_prefix = compass_setting.INSTALLATION_LOGDIR[self.NAME]
             self._clean_system(fullname)
             self._clean_log(log_dir_prefix, fullname)
         except Exception as ex:
@@ -227,27 +230,16 @@ class CobblerInstaller(OSInstaller):
 
     def _get_tmpl_vars_dict(self, host_id, **kwargs):
         vars_dict = {}
-        fullname = None
-        if self.FULLNAME in kwargs:
-            fullname = kwargs[self.FULLNAME]
-        else:
-            fullname = self.config_manager.get_host_fullname(host_id)
-
         if self.PROFILE in kwargs:
             profile = kwargs[self.PROFILE]
         else:
             os_version = self.config_manager.get_os_version()
             profile = self._get_profile_from_server(os_version)
-        
-        # Set fullname, MAC address and hostname, networks, and dns
-        vars_dict[self.FULLNAME] = fullname
-        vars_dict[self.MAC_ADDR] = self.config_manager.get_host_mac_address(
-                                   host_id)
-        vars_dict[self.HOSTNAME] = self.config_manager.get_hostname(host_id)
         vars_dict[self.PROFILE] = profile
-        vars_dict[self.NETWORKS] = self.config_manager.get_host_networks(
-                                                                  host_id)
-        vars_dict[self.DNS] = self.config_manager.get_host_dns(host_id)
+
+        # Set fullname, MAC address and hostname, networks, and dns
+        host_baseinfo = self.config_manager.get_host_baseinfo(host_id)
+        util.merge_dict(vars_dict,host_baseinfo)
 
         os_config_metadata = self.config_manager.get_os_config_metadata()
         host_os_config = self.config_manager.get_host_os_config(host_id)
