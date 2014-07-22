@@ -356,7 +356,7 @@ PKInstaller.register(ChefInstaller)
 class ChefConfigManager(BaseConfigManager):
     TMPL_DIR = 'tmpl_dir'
     DATABAG_NAME = "databag"
-    CHEFSERVER_URL = "chef_server_url"
+    CHEFSERVER_URL = "chef_server_host"
     KEY_DIR = "key_dir"
     CLIENT = "client_name"
 

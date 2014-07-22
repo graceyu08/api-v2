@@ -31,7 +31,7 @@ class CobblerInstaller(OSInstaller):
     CREDENTIALS = "credentials"
     USERNAME = 'username'
     PASSWORD = 'password'
-    INSTALLER_URL = "cobbler_url"
+    INSTALLER_URL = "cobbler_host"
     TMPL_DIR = 'tmpl_dir'
     SYS_TMPL = 'system.tmpl'
     SYS_TMPL_NAME = 'system.tmpl'
@@ -47,13 +47,14 @@ class CobblerInstaller(OSInstaller):
         try:
             username = installer_settings[self.CREDENTIALS][self.USERNAME]
             password = installer_settings[self.CREDENTIALS][self.PASSWORD]
-            cobbler_url = installer_settings[self.INSTALLER_URL]
+            cobbler_host = installer_settings[self.INSTALLER_URL]
             self.tmpl_dir = installer_settings[self.TMPL_DIR]
+
         except KeyError as ex:
             raise KeyError(ex.message)
 
         # the connection is created when cobbler installer is initialized.
-        self.remote_ = self._get_cobbler_server(cobbler_url)
+        self.remote_ = self._get_cobbler_server(cobbler_host)
         self.token_ = self._get_token(username, password)
         self.pk_installer_config = None
 
@@ -64,12 +65,12 @@ class CobblerInstaller(OSInstaller):
             self.__class__.__name__, self.NAME,
             self.remote_, self.token_)
 
-    def _get_cobbler_server(self, cobbler_url):
-        if not cobbler_url:
-            logging.error("Cobbler URL is None!")
-            raise Exception("Cobbler URL cannot be None!")
+    def _get_cobbler_server(self, cobbler_host):
+        if not cobbler_host:
+            logging.error("Cobbler HOST is None!")
+            raise Exception("Cobbler HOST cannot be None!")
 
-        return xmlrpclib.Server(cobbler_url, allow_none=True)
+        return xmlrpclib.Server(cobbler_host)
 
     def _get_token(self, username, password):
         if self.remote_ is None:
@@ -109,23 +110,35 @@ class CobblerInstaller(OSInstaller):
         self._sync()
 
     def set_package_installer_config(self, package_configs):
+        """Cobbler can install and configure package installer right after
+           OS installation compelets by setting package_config info provided
+           by package installer.
+           
+           :param package_configs: dict of package installer config info.
+        """
         self.pk_installer_config = package_configs
 
     def _sync(self):
         """Sync the updated config to cobbler and trigger installation."""
-        self.remote_.sync(self.token_)
-        logging.debug('sync %s', self)
-        os.system('service rsyslog restart')
+        try:
+            self.remote_.sync(self.token_)    
+            logging.debug('sync %s', self)
+            os.system('sudo service rsyslog restart')
+        except Exception as ex:
+            raise ex
 
     def _get_system_config(self, vars_dict):
-        """get updated system config."""
+        """Generate updated system config from the template.
+           
+           :param vars_dict: dict of variables for the system template to
+                             generate system config dict.
+        """
         os_version = self.config_manager.get_os_version()
         system_tmpl_file = os.path.join(os.path.join(self.tmpl_dir, os_version),
                                         self.SYS_TMPL_NAME)
         system_config = self.get_config_from_template(system_tmpl_file,
                                                       vars_dict)
-
-        # update package config info to ksmeta
+        # update package config info to cobbler ksmeta
         if self.pk_installer_config:
             ksmeta = system_config.setdefault("ksmeta", {})
             util.merge_dict(ksmeta, self.pk_installer_config)
@@ -142,19 +155,18 @@ class CobblerInstaller(OSInstaller):
         profile = result[0]
         return profile
 
-    def _get_system_id(self, fullname, create_if_not_exists=True):
+    def _get_system_id(self, fullname):
         """get system reference id for the host."""
         sys_name = fullname
-        try:
+        sys_id = None
+        system_info = self.remote_.find_system({"name": fullname})
+        if not system_info:
+            #Create a new system
+            sys_id = self.remote_.new_system(self.token_)
+            self.remote_.modify_system(sys_id, "name", fullname, self.token_)
+            logging.debug('create new system %s for %s', sys_id, sys_name)
+        else:
             sys_id = self.remote_.get_system_handle(sys_name, self.token_)
-
-            logging.debug('using existing system %s for %s', sys_id, sys_name)
-        except Exception:
-            if create_if_not_exists:
-                sys_id = self.remote_.new_system(self.token_)
-                logging.debug('create new system %s for %s', sys_id, sys_name)
-            else:
-                sys_id = None
 
         return sys_id
 
@@ -173,8 +185,8 @@ class CobblerInstaller(OSInstaller):
 
     def _update_system_config(self, sys_id, system_config):
         """update modify system."""
-        for key, value in system_config.items():
-            self.remote_.modify_system(sys_id, key, value, self.token_)
+        for key, value in system_config.iteritems():
+            self.remote_.modify_system(sys_id, str(key), value, self.token_)
 
     def _netboot_enabled(self, sys_id):
         """enable netboot."""
@@ -199,7 +211,7 @@ class CobblerInstaller(OSInstaller):
         host_ids = self.config_manager.get_host_id_list()
         for host_id in host_ids:
             fullname = self.config_manager.get_host_fullname(host_id)
-            sys_id = self._get_system_id(fullname, False)
+            sys_id = self._get_system_id(fullname)
             if sys_id:
                 self._netboot_enabled(sys_id)
                 self._save_system(sys_id)
@@ -258,5 +270,5 @@ class CobblerConfigManager(BaseConfigManager):
 
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(CobblerConfigManager, self).__init__(adapter_info,
-                                                cluster_info,
-                                                hosts_info)
+                                                   cluster_info,
+                                                   hosts_info)

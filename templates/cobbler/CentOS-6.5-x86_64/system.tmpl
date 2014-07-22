@@ -1,0 +1,46 @@
+{
+    "name": "$host.fullname",
+    "hostname": "$host.hostname",
+    "profile": "$host.profile",
+    "gateway": "$host.gateway",
+    "name_servers": "$host.name_servers",
+    "name_servers_search": "$host.search_path",
+    "proxy": "$host.http_proxy",
+    "modify_interface":
+        #import simplejson
+        #set interfaces = $host.networks.interfaces
+        #set rekeyed = {}
+        #for $nic, $val in $interfaces.iteritems():
+            #set ip_key = '-'.join(('ipaddress', $nic))                          
+            #set netmask_key = '-'.join(('netmask', $nic))                       
+            #set mgmt_key = '-'.join(('management', $nic))                       
+            #set static_key = '-'.join(('static', $nic))                         
+            #set $rekeyed[$ip_key] = $val.ip                                     
+            #set $rekeyed[$netmask_key] = $val.netmask                           
+            #set $rekeyed[$mgmt_key] = $val.is_mgmt                              
+            #set $rekeyed[$static_key] = True                                    
+                                                                                 
+        #if $val.is_mgmt:                                                        
+          #set mac_key = '-'.join(('macaddress', $nic))                          
+          #set dns_key = '-'.join(('dns', $nic))                                 
+          #set $rekeyed[$mac_key] = $host.mac_address                            
+          #set $rekeyed[$dns_key] = $host.dns                                    
+            #end if
+        #end for
+        #set $str=simplejson.dumps($rekeyed, encoding='utf-8')
+        $str
+    ,
+    "ksmeta":{
+        "username": "$host.server_credentials.username",
+        #import crypt
+        #set $password = crypt.crypt($host.server_credentials.password, "az")
+        "password": "$password",
+        #set f=[(k + ' ' + v['vol_percentage'] or v['vol_size']) for k,v in $host.partition.iteritems()]
+        #set $partition_config = '; '.join($f)
+        "partition": "$partition_config",
+        "https_proxy": "$host.https_proxy",
+        "ignore_proxy": "$host.ignore_proxy",
+        "ntp_server": "$host.ntp_server"
+    }
+}
+

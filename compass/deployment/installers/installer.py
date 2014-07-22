@@ -101,8 +101,8 @@ class Installer(object):
         if not os.path.exists(tmpl_dir) or not vars_dict:
             raise Exception("Template or variables dict is not specified!")
         tmpl = Template(file=tmpl_dir, searchList=[vars_dict])
-        config = json.loads(tmpl.respond())
-
+        config = json.loads(tmpl.respond(), encoding='utf-8')
+        config = json.loads(json.dumps(config), encoding='utf-8')
         return config
 
 

@@ -3,15 +3,25 @@
     "hostname": "$host.hostname",
     "profile": "$host.profile",
     "gateway": "$host.gateway",
-    "interfaces": 
+    "modify_interface": 
         #import simplejson
         #set interfaces = $host.networks.interfaces
 	    #set rekeyed = {}
         #for $nic, $val in $interfaces.iteritems():
-            #set $rekeyed[$nic] = { "ip_address": $val.ip, "netmask": $val.netmask, "management": $val.is_mgmt, "static" : True }
-	    #if $val.is_mgmt:
-	      #set $rekeyed[$nic]["mac_address"] = $host.mac_address
-	      #set $rekeyed[$nic]["dns_name"] = $host.dns
+            #set ip_key = '-'.join(('ipaddress', $nic))
+            #set netmask_key = '-'.join(('netmask', $nic))
+            #set mgmt_key = '-'.join(('management', $nic))
+            #set static_key = '-'.join(('static', $nic))
+            #set $rekeyed[$ip_key] = $val.ip
+            #set $rekeyed[$netmask_key] = $val.netmask
+            #set $rekeyed[$mgmt_key] = $val.is_mgmt
+            #set $rekeyed[$static_key] = True
+
+	        #if $val.is_mgmt:
+               #set mac_key = '-'.join(('macaddress', $nic))
+               #set dns_key = '-'.join(('dns', $nic))
+	           #set $rekeyed[$mac_key] = $host.mac_address
+	           #set $rekeyed[$dns_key] = $host.dns
             #end if
         #end for
         #set $str=simplejson.dumps($rekeyed)

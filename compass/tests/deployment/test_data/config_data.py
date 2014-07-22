@@ -12,7 +12,7 @@ adapter_test_config = {
     "os_installer": {
         "name": "test_cobbler",
         "settings": {
-            "cobbler_url": "127.0.0.1",
+            "cobbler_host": "127.0.0.1",
             "credentials": {
                 "username": "cobbler",
                 "password": "cobbler"
@@ -23,7 +23,7 @@ adapter_test_config = {
     "pk_installer": {
         "name": "test_chef",
         "settings": {
-            "chef_server_url": "127.0.0.1",
+            "chef_server_host": "127.0.0.1",
             "key_dir": "xxx",
             "client_name": "xxx",
             "tmpl_dir": chef_tmpl_dir
@@ -165,7 +165,7 @@ hosts_test_config = {
         "reinstall_os": False,
         "os_version": "Ubuntu-12.04-x86_64",
         "mac_address": "mac_01",
-        "hostname": "server_01",
+        "hostname": "server01",
         "networks": {
             "interfaces": {
                 "vnet0": {
@@ -220,7 +220,7 @@ hosts_test_config = {
         "reinstall_os": True,
         "os_version": "Ubuntu-12.04-x86_64",
         "mac_address": "mac_02",
-        "hostname": "server_02",
+        "hostname": "server02",
         "networks": {
             "interfaces": {
                 "eth0": {
@@ -267,7 +267,7 @@ hosts_test_config = {
         "reinstall_os": False,
         "os_version": "Ubuntu-12.04-x86_64",
         "mac_address": "mac_03",
-        "hostname": "server_03",
+        "hostname": "server03",
         "networks": {
             "interfaces": {
                 "eth0": {

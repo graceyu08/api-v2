@@ -40,10 +40,10 @@ class TestCobblerInstaller(unittest2.TestCase):
             "host": {
                 "host_id": 1,
                 "mac_address": "mac_01",
-                "fullname": "server_01.test",
+                "fullname": "server01.test",
                 "profile": "Ubuntu-12.04-x86_64",
-                "hostname": "server_01",
-                "dns": "server_01.test.ods.com",
+                "hostname": "server01",
+                "dns": "server01.test.ods.com",
                 "os_installed": False,
                 "os_version": "Ubuntu-12.04-x86_64",
                 "reinstall_os": False,
@@ -108,39 +108,35 @@ class TestCobblerInstaller(unittest2.TestCase):
 
     def test_get_system_config(self):
         expected_system_config = {
-            "name": "server_01.test",
-            "hostname": "server_01",
+            "name": "server01.test",
+            "hostname": "server01",
             "profile": "Ubuntu-12.04-x86_64",
             "gateway": "192.168.2.1",
-            "interfaces": {
-                "vnet0": {
-                    "ip_address": "192.168.1.1",
-                    "netmask": "255.255.255.0",
-                    "management": True,
-                    "mac_address": "mac_01",
-                    "dns_name": "server_01.test.ods.com",
-                    "static": True
-                },
-                "vnet1": {
-                    "ip_address": "172.16.1.1",
-                    "netmask": "255.255.255.0",
-                    "management": False,
-                    "static": True
-                }
+            "modify_interface": {
+                "ipaddress-vnet0": "192.168.1.1",
+                "netmask-vnet0": "255.255.255.0",
+                "management-vnet0": True,
+                "macaddress-vnet0": "mac_01",
+                "dns-vnet0": "server01.test.ods.com",
+                "static-vnet0": True,
+                "ipaddress-vnet1": "172.16.1.1",
+                "netmask-vnet1": "255.255.255.0",
+                "management-vnet1": False,
+                "static-vnet1": True
             },
             "ksmeta":{
                 "timezone" : "UTC",
                 "partition": "/var 20%;/home 40%",
-                "chef_url": "https://127.0.0.1",
-                "chef_client_name": "server_01.test",
-                "chef_node_name": "server_01.test",
+                "chef_server_host": "https://127.0.0.1",
+                "chef_client_name": "server01.test",
+                "chef_node_name": "server01.test",
                 "tool": "chef"
             }
         }
         package_config = {
-            "chef_url": "https://127.0.0.1",
-            "chef_client_name": "server_01.test",
-            "chef_node_name": "server_01.test",
+            "chef_server_host": "https://127.0.0.1",
+            "chef_client_name": "server01.test",
+            "chef_node_name": "server01.test",
             "tool": "chef"
         }
         self.test_cobbler.set_package_installer_config(package_config)
