@@ -16,7 +16,7 @@
 
 """Test deploy_manager module."""
 
-
+from mock import Mock
 import os
 import unittest2
 
@@ -30,27 +30,10 @@ reload(setting)
 
 
 from compass.deployment.deploy_manager import DeployManager
-from compass.deployment.installers.installer import PKInstaller
-from compass.deployment.installers.installer import OSInstaller
+from compass.deployment.installers.pk_installers.chef_installer.chef_installer import ChefInstaller
+from compass.deployment.installers.os_installers.cobbler.cobbler import CobblerInstaller
 from compass.tests.deployment.test_data import config_data
 
-
-class DummyOSInstaller(OSInstaller):
-    NAME = 'test_cobbler'
-
-    def __init__(self, adapter_info, cluster_info, hosts_info):
-        super(DummyOSInstaller, self).__init__()
-        self.hosts_info = hosts_info
-
-OSInstaller.register(DummyOSInstaller)
-
-class DummyPKInstaller(PKInstaller):
-    NAME = 'test_chef'
-    
-    def __init__(self, adapter_info, cluster_info, hosts_info):
-        super(DummyPKInstaller, self).__init__()
-
-PKInstaller.register(DummyPKInstaller)
 
 class TestDeployManager(unittest2.TestCase):
     """Test DeployManager methods."""
@@ -65,18 +48,11 @@ class TestDeployManager(unittest2.TestCase):
         cluster_info = deepcopy(config_data.cluster_test_config)
         hosts_info = deepcopy(config_data.hosts_test_config)
 
-        # Test if DeployManager is instantiated successfully
+        DeployManager.get_installer = Mock()
+        DeployManager.get_installer.return_value = "mock_installer"
+
         test_manager = DeployManager(adapter_info, cluster_info, hosts_info)
         self.assertIsNotNone(test_manager)
-
-        # Test if installers are the expected ones.
-        expected_pk_installer_name = adapter_info['pk_installer']['name']
-        expected_os_installer_name = adapter_info['os_installer']['name']
-
-        pk_installer_name = test_manager.pk_installer.NAME
-        os_installer_name = test_manager.os_installer.NAME
-        self.assertEqual(expected_pk_installer_name, pk_installer_name)
-        self.assertEqual(expected_os_installer_name, os_installer_name)
 
         # Test hepler function _get_hosts_for_os_installation return correct
         # number of hosts config for os deployment. In config_data, two out of

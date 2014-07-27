@@ -30,7 +30,8 @@ from compass.utils import setting_wrapper as compass_setting
 reload(compass_setting)
 
 
-from compass.deployment.installers.pk_installers.chef.chef import ChefInstaller
+from compass.deployment.installers.pk_installers.chef_installer.chef_installer\
+    import ChefInstaller
 from compass.tests.deployment.test_data import config_data
 
 
@@ -57,7 +58,20 @@ class TestChefInstaller(unittest2.TestCase):
         pass
 
     def test_get_node_attributes(self):
-        pass
+        cluster_dict = self.test_chef._get_cluster_tmpl_vars()
+        vars_dict = self.test_chef._get_host_tmpl_vars(2, cluster_dict)
+        expected_node_attr = {
+            "override_attributes": {
+                "endpoints": {
+                    "compute-vnc-bind": {
+                        "host": "192.168.1.2"
+                    }
+                }
+            }
+        }
+        output = self.test_chef._get_node_attributes(['os-compute'], vars_dict)
+        self.maxDiff = None
+        self.assertDictEqual(expected_node_attr, output)
 
     def test_get_env_attributes(self):
         expected_env = {

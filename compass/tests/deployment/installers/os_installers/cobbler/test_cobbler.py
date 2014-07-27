@@ -36,17 +36,16 @@ class TestCobblerInstaller(unittest2.TestCase):
     def setUp(self):
         super(TestCobblerInstaller, self).setUp()
         self.test_cobbler = self._get_cobbler_installer()
-        self.expected_vars_dict = {
+        self.expected_host_vars_dict = {
             "host": {
                 "host_id": 1,
                 "mac_address": "mac_01",
                 "fullname": "server01.test",
                 "profile": "Ubuntu-12.04-x86_64",
-                "hostname": "server01",
+                "name": "server01",
                 "dns": "server01.test.ods.com",
-                "os_installed": False,
                 "os_version": "Ubuntu-12.04-x86_64",
-                "reinstall_os": False,
+                "reinstall_os": True,
                 "networks": {
                     "interfaces": {
                         "vnet0": {
@@ -76,7 +75,7 @@ class TestCobblerInstaller(unittest2.TestCase):
                     }
                 },
                 "language": "EN",
-                "gateway": "192.168.2.1",
+                "gateway": "10.145.88.1",
                 "timezone": "UTC"
             }
         }
@@ -98,20 +97,22 @@ class TestCobblerInstaller(unittest2.TestCase):
         CobblerInstaller._get_token.return_value = "mock_token"
         return CobblerInstaller(adapter_info, cluster_info, hosts_info)
 
-    def test_get_tmpl_vars_dict(self):
+    def test_get_host_tmpl_vars_dict(self):
         host_id = 1
         profile = 'Ubuntu-12.04-x86_64'
-        output = self.test_cobbler._get_tmpl_vars_dict(host_id,
-                                                       profile=profile)
+        global_vars_dict = self.test_cobbler._get_cluster_tmpl_vars_dict()
+        output = self.test_cobbler._get_host_tmpl_vars_dict(host_id,
+                                                            global_vars_dict,
+                                                            profile=profile)
         self.maxDiff = None
-        self.assertDictEqual(self.expected_vars_dict, output)
+        self.assertDictEqual(self.expected_host_vars_dict, output)
 
     def test_get_system_config(self):
         expected_system_config = {
-            "name": "server01.test",
+            "name": "server01",
             "hostname": "server01",
             "profile": "Ubuntu-12.04-x86_64",
-            "gateway": "192.168.2.1",
+            "gateway": "10.145.88.1",
             "modify_interface": {
                 "ipaddress-vnet0": "192.168.1.1",
                 "netmask-vnet0": "255.255.255.0",
@@ -127,20 +128,23 @@ class TestCobblerInstaller(unittest2.TestCase):
             "ksmeta":{
                 "timezone" : "UTC",
                 "partition": "/var 20%;/home 40%",
-                "chef_server_host": "https://127.0.0.1",
+                "chef_url": "https://127.0.0.1",
                 "chef_client_name": "server01.test",
                 "chef_node_name": "server01.test",
                 "tool": "chef"
             }
         }
         package_config = {
-            "chef_server_host": "https://127.0.0.1",
-            "chef_client_name": "server01.test",
-            "chef_node_name": "server01.test",
-            "tool": "chef"
+            1:{
+                "chef_url": "https://127.0.0.1",
+                "chef_client_name": "server01.test",
+                "chef_node_name": "server01.test",
+                "tool": "chef"
+            }
         }
+        host_id = 1
         self.test_cobbler.set_package_installer_config(package_config)
-        output = self.test_cobbler._get_system_config(self.expected_vars_dict)
+        output = self.test_cobbler._get_system_config(host_id,
+            self.expected_host_vars_dict)
         self.maxDiff = None
         self.assertEqual(expected_system_config, output)
-

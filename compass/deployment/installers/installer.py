@@ -16,12 +16,16 @@
 """
 from Cheetah.Template import Template
 from copy import deepcopy
+import imp
 import logging
 import os
 import simplejson as json
 
 
-class Installer(object):
+CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
+
+
+class BaseInstaller(object):
     """Interface for installer."""
     NAME = 'installer'
 
@@ -30,17 +34,17 @@ class Installer(object):
 
     def deploy(self, **kwargs):
         """virtual method to start installing process."""
-        pass
+        raise NotImplementedError
 
     def clean_progress(self, **kwargs):
-        pass
+        raise NotImplementedError
 
     def delete_hosts(self, **kwargs):
         """Delete hosts from installer server."""
-        pass
+        raise NotImplementedError
 
     def redeploy(self, **kwargs):
-        pass
+        raise NotImplementedError
 
     def get_tmpl_vars_from_metadata(self, metadata, config):
         template_vars = {}
@@ -83,33 +87,40 @@ class Installer(object):
                 else:
                     raise KeyError("'%s' is an invalid metadata!" % key)
 
-
-    @classmethod
-    def register(cls, installers_dict, installer):
-        if not isinstance(installers_dict, dict):
-            raise Exception("Installers holder must be a dictionary!")
-
-        if not issubclass(installer, Installer):
-            raise Exception("Not an Installer type! Cannot register!")
-
-        if installer.NAME in installers_dict:
-            raise KeyError("installer '%s' already exists!", installer.NAME)
-
-        installers_dict[installer.NAME] = installer
-
     def get_config_from_template(self, tmpl_dir, vars_dict):
         if not os.path.exists(tmpl_dir) or not vars_dict:
-            raise Exception("Template or variables dict is not specified!")
+            logging.info("Template or variables dict is not specified!")
+            return {}
+
         tmpl = Template(file=tmpl_dir, searchList=[vars_dict])
         config = json.loads(tmpl.respond(), encoding='utf-8')
         config = json.loads(json.dumps(config), encoding='utf-8')
         return config
 
+    @classmethod
+    def get_installer(cls, name, path, **kwargs):
+        installer = None
+        try:
+            mod_file, path, descr = imp.find_module(name, [path])
+            if mod_file:
+                mod = imp.load_module(name, mod_file, path, descr)
+                adapter_info = kwargs['adapter_info']
+                cluster_info = kwargs['cluster_info']
+                hosts_info = kwargs['hosts_info']
+                installer = getattr(mod, mod.NAME)(adapter_info, cluster_info,
+                                                   hosts_info)
 
-class OSInstaller(Installer):
+        except ImportError as exc:
+            logging.error('No such module found: %s', name)
+            logging.exception(exc)
+
+        return installer
+
+
+class OSInstaller(BaseInstaller):
     """Interface for os installer."""
     NAME = 'OSInstaller'
-    OS_INSTALLERS = {}
+    INSTALLER_BASE_DIR = os.path.join(CURRENT_DIR, 'os_installers')
 
     def get_oses(self):
         """virtual method to get supported oses.
@@ -118,27 +129,41 @@ class OSInstaller(Installer):
         """
         return []
 
-    @classmethod
-    def register(cls, installer):
-        if not issubclass(installer, OSInstaller):
-            name = installer.NAME
-            raise Exception("'%s' is not OS Installer type!", name)
-        super(OSInstaller, cls).register(cls.OS_INSTALLERS, installer)
+    def poweron(self):
+        pass
+
+    def poweroff(self):
+        pass
+
+    def reset(self):
+        pass
 
     @classmethod
-    def get_os_installer(cls, name):
-        if name not in cls.OS_INSTALLERS:
-            err_msg = "Cannot found Installer '%s'!" % name
-            logging.debug(err_msg)
-            raise KeyError(err_msg)
+    def get_installer(cls, name, adapter_info, cluster_info, hosts_info):
+        path = os.path.join(cls.INSTALLER_BASE_DIR, name)
+        installer = super(OSInstaller, cls).get_installer(name, path,
+            adapter_info=adapter_info, cluster_info=cluster_info,
+            hosts_info=hosts_info)
 
-        return cls.OS_INSTALLERS[name]
+        if not isinstance(installer, OSInstaller):
+            logging.info("Installer '%s' is not an OS installer!" % name)
+            return None
 
 
-class PKInstaller(Installer):
+    def poweron(self, host_id):
+        pass
+
+    def poweroff(self, host_id):
+        pass
+
+    def reset(self, host_id):
+        pass
+
+
+class PKInstaller(BaseInstaller):
     """Interface for package installer."""
     NAME = 'PKInstaller'
-    PK_INSTALLERS = {}
+    INSTALLER_BASE_DIR = os.path.join(CURRENT_DIR, 'pk_installers')
 
     def get_target_systems(self):
         """virtual method to get available target_systems for each os.
@@ -161,17 +186,14 @@ class PKInstaller(Installer):
         return {}
 
     @classmethod
-    def register(cls, installer):
-        if not issubclass(installer, PKInstaller):
-            name = installer.NAME
-            raise Exception("'%s' is not Package Installer type!", name)
-        super(PKInstaller, cls).register(cls.PK_INSTALLERS, installer)
+    def get_installer(cls, name, adapter_info, cluster_info, hosts_info):
+        path = os.path.join(cls.INSTALLER_BASE_DIR, name)
+        installer = super(PKInstaller, cls).get_installer(name, path,
+            adapter_info=adapter_info, cluster_info=cluster_info,
+            hosts_info=hosts_info)
 
-    @classmethod
-    def get_package_installer(cls, name):
-        if name not in cls.PK_INSTALLERS:
-            err_msg = "Cannot found Installer '%s'!" % name
-            logging.debug(err_msg)
-            raise KeyError(err_msg)
+        if not isinstance(installer, PKInstaller):
+            logging.info("Installer '%s' is not a package installer!" % name)
+            return None
 
-        return cls.PK_INSTALLERS[name]
+        return installer

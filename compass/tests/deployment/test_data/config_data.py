@@ -10,7 +10,7 @@ adapter_test_config = {
     "name": "openstack_icehouse",
     "roles": ["os-controller", "os-compute-worker", "os-network"],
     "os_installer": {
-        "name": "test_cobbler",
+        "name": "cobbler",
         "settings": {
             "cobbler_host": "127.0.0.1",
             "credentials": {
@@ -21,7 +21,7 @@ adapter_test_config = {
         }
     },
     "pk_installer": {
-        "name": "test_chef",
+        "name": "chef_installer",
         "settings": {
             "chef_server_host": "127.0.0.1",
             "key_dir": "xxx",
@@ -46,8 +46,8 @@ adapter_test_config = {
                 },
                 "default_gateway": {
                     "_self": {
-                        "mapping_to": "gateway"    
-                    }    
+                        "mapping_to": "gateway"
+                    }
                 },
                 "domain": {
                     "_self": {"mapping_to": ""}
@@ -106,6 +106,12 @@ adapter_test_config = {
                     "interface": {
                         "_self": {}
                     }
+                },
+                "tenant": {
+                    "_self": {},
+                    "interface": {
+                        "_self": {}
+                    }
                 }
             },
             "roles": {
@@ -152,6 +158,9 @@ cluster_test_config = {
                 "interface": "eth0"
             },
             "public": {
+                "interface": "eth2"
+            },
+            "tenant": {
                 "interface": "eth1"
             }
         }
@@ -161,11 +170,10 @@ cluster_test_config = {
 hosts_test_config = {
     1: {
         "host_id": 1,
-        "os_installed": False,
-        "reinstall_os": False,
+        "reinstall_os": True,
         "os_version": "Ubuntu-12.04-x86_64",
         "mac_address": "mac_01",
-        "hostname": "server01",
+        "name": "server01",
         "networks": {
             "interfaces": {
                 "vnet0": {
@@ -186,10 +194,7 @@ hosts_test_config = {
         },
         "os_config": {
             "general": {
-                "language": "EN",
-                "timezone": "UTC",
-                "default_gateway": "192.168.2.1",
-                "domain": "ods.com"
+                "default_gateway": "10.145.88.1",
             },
             "partition": {
                 "/var": {
@@ -203,24 +208,23 @@ hosts_test_config = {
             }
         },
         "package_config": {
-            "network_mapping": {                                                                                                          
-                "management": {                                                    
-                    "interface": "vnet0"                                            
-                },                                                                 
-                "public": {                                                        
-                    "interface": "vnet1"                                            
-                }                                                                  
+            "network_mapping": {
+                "management": {
+                    "interface": "vnet0"
+                },
+                "tenant": {
+                    "interface": "vnet1"
+                }
             },
             "roles": ["os-controller"]
         }
     },
     2: {
         "host_id": 2,
-        "os_installed": True,
         "reinstall_os": True,
         "os_version": "Ubuntu-12.04-x86_64",
         "mac_address": "mac_02",
-        "hostname": "server02",
+        "name": "server02",
         "networks": {
             "interfaces": {
                 "eth0": {
@@ -234,7 +238,7 @@ hosts_test_config = {
                     "ip": "172.16.1.2",
                     "netmask": "255.255.255.0",
                     "is_mgmt": False,
-                    "is_promiscuous": True,
+                    "is_promiscuous": False,
                     "subnet": "172.16.1.0/24"
                 }
             }
@@ -258,16 +262,15 @@ hosts_test_config = {
             }
         },
         "package_config": {
-            "roles": ["os-compute", "os-network"]
+            "roles": ["os-compute"]
         }
     },
     3: {
         "host_id": 3,
-        "os_installed": True,
         "reinstall_os": False,
         "os_version": "Ubuntu-12.04-x86_64",
         "mac_address": "mac_03",
-        "hostname": "server03",
+        "name": "server03",
         "networks": {
             "interfaces": {
                 "eth0": {
@@ -281,8 +284,15 @@ hosts_test_config = {
                     "ip": "172.16.1.3",
                     "netmask": "255.255.255.0",
                     "is_mgmt": False,
-                    "is_promiscuous": True,
+                    "is_promiscuous": False,
                     "subnet": "172.16.1.0/24"
+                },
+                "eth2": {
+                    "ip": "10.0.0.1",
+                    "netmask": "255.255.255.0",
+                    "is_mgmt": False,
+                    "is_promiscuous": True,
+                    "subnet": "10.0.0.0/24"
                 }
             }
         },
