@@ -15,6 +15,8 @@
 """All keywords variables in deployment are defined in this module."""
 
 
+# TODO(grace): Either place this in alphabetical order or put them
+# in multiple blocks, each of which is preceded by a brief description.
 CLUSTER_ID = 'cluster_id'
 OS_VERSION = 'os_version'
 CLUSTER_NAME = 'cluster_name'

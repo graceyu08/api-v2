@@ -30,7 +30,7 @@ class BaseInstaller(object):
     NAME = 'installer'
 
     def __repr__(self):
-        return '%s[%s]' % (self.__class__.__name__, self.NAME)
+        return '%r[%r]' % (self.__class__.__name__, self.NAME)
 
     def deploy(self, **kwargs):
         """virtual method to start installing process."""
@@ -52,15 +52,17 @@ class BaseInstaller(object):
 
         return template_vars
 
-    def _get_tmpl_vars_helper(self, metadata, config, output):
-        for key in config:
-            config_value = config[key]
+    # TODO(grace): I have slightly modified this impl.
+    # Please decide which one to use.
+    def _get_tmpl_vars_helper2(self, metadata, config, output):
+        for key, config_value in config.iteritems():
             if key in metadata:
                 sub_meta = metadata[key]
                 try:
                     mapping_to_value = sub_meta['_self']['mapping_to']
                 except KeyError:
                     mapping_to_value = None
+
                 if mapping_to_value:
                     mapping_to = sub_meta['_self']['mapping_to']
                     if isinstance(config_value, dict):
@@ -68,7 +70,7 @@ class BaseInstaller(object):
                         self._get_tmpl_vars_helper(sub_meta, config_value,
                                                    output[mapping_to])
                     else:
-                        output[mapping_to] = config[key]
+                        output[mapping_to] = config_value
                 elif isinstance(config_value, dict):
                     self._get_tmpl_vars_helper(sub_meta, config_value,
                                                output)
@@ -81,11 +83,48 @@ class BaseInstaller(object):
                     if isinstance(config_value, dict):
                         output[key] = {}
                         self._get_tmpl_vars_helper(sub_meta, config_value,
-                                                       output[key])
+                                                   output[key])
                     else:
                         output[key] = config_value
                 else:
                     raise KeyError("'%s' is an invalid metadata!" % key)
+        
+    def _get_key_mapping(self, is_regular_key, metadata, key):
+        mapping_to = key
+        if is_regular_key:
+            try:
+                mapping_to = metadata['_self']['mapping_to']
+            except:
+                mapping_to = None
+        return mapping_to
+
+    def _get_submeta_by_key(self, metadata, key):
+        if key in metadata:
+            return (True, metadata[key])
+    
+        temp = deepcopy(metadata)
+        del temp['_self']
+        meta_key = temp.keys()[0]
+        if meta_key.startswith("$"):
+            return (False, metadata[meta_key])
+
+        raise KeyError("'%s' is an invalid metadata!" % key)
+
+    def _get_tmpl_vars_helper(self, metadata, config, output):
+        for key, config_value in config.iteritems():
+            regular_key, sub_meta = self._get_submeta_by_key(metadata, key)
+            mapping_to = self._get_key_mapping(regular_key, sub_meta, key)
+
+            if isinstance(config_value, dict):
+                if mapping_to:
+                    new_output = output[mapping_to] = {}
+                else:
+                    new_output = output
+
+                self._get_tmpl_vars_helper(sub_meta, config_value,
+                                           new_output)
+            elif mapping_to:
+                output[mapping_to] = config_value
 
     def get_config_from_template(self, tmpl_dir, vars_dict):
         if not os.path.exists(tmpl_dir) or not vars_dict:
@@ -99,7 +138,6 @@ class BaseInstaller(object):
 
     @classmethod
     def get_installer(cls, name, path, **kwargs):
-        installer = None
         try:
             mod_file, path, descr = imp.find_module(name, [path])
             if mod_file:
@@ -107,8 +145,8 @@ class BaseInstaller(object):
                 adapter_info = kwargs['adapter_info']
                 cluster_info = kwargs['cluster_info']
                 hosts_info = kwargs['hosts_info']
-                installer = getattr(mod, mod.NAME)(adapter_info, cluster_info,
-                                                   hosts_info)
+                return getattr(mod, mod.NAME)(adapter_info, cluster_info,
+                                              hosts_info)
 
         except ImportError as exc:
             logging.error('No such module found: %s', name)
@@ -129,15 +167,6 @@ class OSInstaller(BaseInstaller):
         """
         return []
 
-    def poweron(self):
-        pass
-
-    def poweroff(self):
-        pass
-
-    def reset(self):
-        pass
-
     @classmethod
     def get_installer(cls, name, adapter_info, cluster_info, hosts_info):
         path = os.path.join(cls.INSTALLER_BASE_DIR, name)
@@ -148,7 +177,6 @@ class OSInstaller(BaseInstaller):
         if not isinstance(installer, OSInstaller):
             logging.info("Installer '%s' is not an OS installer!" % name)
             return None
-
 
     def poweron(self, host_id):
         pass

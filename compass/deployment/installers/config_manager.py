@@ -24,6 +24,8 @@ from compass.utils import util
 
 class BaseConfigManager(object):
 
+    # TODO(grace): A question here: will the deployed_config
+    # be part of cluster_info or hosts_info?
     def __init__(self, adapter_info, cluster_info, hosts_info):
         self.adapter_info = adapter_info
         self.cluster_info = cluster_info
@@ -118,6 +120,7 @@ class BaseConfigManager(object):
 
         return self.cluster_info[const.DEPLOY_PK_CONFIG]
 
+    # TODO(grace): shall this be called merge rather than set?
     def set_cluster_deploy_os_config(self, deploy_os_config):
         if deploy_os_config is None:
             return

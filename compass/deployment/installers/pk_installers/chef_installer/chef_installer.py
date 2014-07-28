@@ -82,6 +82,9 @@ class ChefInstaller(PKInstaller):
     def get_databag(self, databag_name):
         import chef
         bag = chef.DataBag(databag_name, api=self.api_)
+
+        # TODO(grace): Why do we need to save() here?
+        # This is a getter method. Or is this a create()?
         bag.save()
         return bag
 
@@ -98,6 +101,7 @@ class ChefInstaller(PKInstaller):
             raise Exception("Cannot find ChefAPI object!")
 
         node = chef.Node(node_name, api=self.api_)
+        # TODO(grace): Same as above
         if node not in chef.Node.list(api=self.api_):
             if env_name:
                 node.chef_environment = env_name

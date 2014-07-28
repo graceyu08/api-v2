@@ -34,6 +34,9 @@ class CobblerInstaller(OSInstaller):
     CREDENTIALS = "credentials"
     USERNAME = 'username'
     PASSWORD = 'password'
+
+    # TODO(grace): URL and host are different.
+    # Be more precise in the naming here.
     INSTALLER_URL = "cobbler_host"
     TMPL_DIR = 'tmpl_dir'
     SYS_TMPL = 'system.tmpl'
@@ -44,8 +47,13 @@ class CobblerInstaller(OSInstaller):
     POWER_USER = 'power_user'
     POWER_PASS = 'power_pass'
 
+    # TODO(grace): I am thinking to pass in ConfigManager object
+    # in the contstructor. In other words, the caller should create
+    # ConfigManager object first and pass it in.
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(CobblerInstaller, self).__init__()
+
+        # TODO(grace): self._config_manager ?
         self.config_manager = CobblerConfigManager(adapter_info,
                                                    cluster_info,
                                                    hosts_info)
@@ -60,6 +68,10 @@ class CobblerInstaller(OSInstaller):
             raise KeyError(ex.message)
 
         # the connection is created when cobbler installer is initialized.
+
+        # TODO(grace): Trailing underscore is a C++ style. In python,
+        # trailing _ is used if the variable would conflict with reserved
+        # keyword in the language.
         self.remote_ = self._get_cobbler_server(cobbler_host)
         self.token_ = self._get_token(username, password)
         self.pk_installer_config = None
@@ -67,7 +79,7 @@ class CobblerInstaller(OSInstaller):
         logging.debug('%s instance created', self)
 
     def __repr__(self):
-        return '%s[name=%s,remote=%s,token=%s' % (
+        return '%r[name=%r,remote=%r,token=%r' % (
             self.__class__.__name__, self.NAME,
             self.remote_, self.token_)
 
@@ -163,6 +175,9 @@ class CobblerInstaller(OSInstaller):
                              generate system config dict.
         """
         os_version = self.config_manager.get_os_version()
+
+        # TODO(grace): this variable name is potentially misleading.
+        # Change it to system_tmpl_path
         system_tmpl_dir = os.path.join(os.path.join(self.tmpl_dir, os_version),
                                         self.SYS_TMPL_NAME)
         system_config = self.get_config_from_template(system_tmpl_dir,

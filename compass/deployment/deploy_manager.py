@@ -49,6 +49,7 @@ class DeployManager(object):
             if installer is None:
                 raise Exception("Installer '%s' is None!" % installer_name)
         except Exception as ex:
+            # TODO(grace): In this case, we can get rid of try..except block
             raise ex
 
         return installer
