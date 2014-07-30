@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+__author__ = "Grace Yu (grace.yu@huawei.com)"
+
 """Module to get configs from provider and isntallers and update
    them to provider and installers.
 """

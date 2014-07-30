@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+__author__ = "Grace Yu (grace.yu@huawei.com)"
+
+
 """modules to read/write cluster/host config from installers.
 
    .. moduleauthor:: Xiaodong Wang <xiaodongwang@huawei.com>
