@@ -12,7 +12,7 @@ adapter_test_config = {
     "os_installer": {
         "name": "cobbler",
         "settings": {
-            "cobbler_host": "127.0.0.1",
+            "cobbler_url": "http://127.0.0.1/cobbler_api",
             "credentials": {
                 "username": "cobbler",
                 "password": "cobbler"
@@ -23,7 +23,7 @@ adapter_test_config = {
     "pk_installer": {
         "name": "chef_installer",
         "settings": {
-            "chef_server_host": "127.0.0.1",
+            "chef_url": "https://127.0.0.1",
             "key_dir": "xxx",
             "client_name": "xxx",
             "tmpl_dir": chef_tmpl_dir
@@ -51,6 +51,23 @@ adapter_test_config = {
                 },
                 "domain": {
                     "_self": {"mapping_to": ""}
+                },
+                "http_proxy": {
+                    "_self": {
+                         "mapping_to": "http_proxy"
+                    }
+                },
+                "ntp_server": {
+                    "_self": {"mapping_to": "ntp_server"}
+                },
+                "dns_servers": {
+                    "_self": {"mapping_to": "nameservers"}
+                },
+                "search_path": {
+                    "_self": {"mapping_to": "search_path"}
+                },
+                "https_proxy": {
+                    "_self": {"mapping_to": "https_proxy"}
                 }
             },
             "partition": {
@@ -65,6 +82,17 @@ adapter_test_config = {
                     "size_percentage": {
                         "_self": {"mapping_to": "vol_percentage"}
                     }
+                }
+            },
+            "server_credentials": {
+                "_self": {
+                    "mapping_to": "server_credentials"
+                },
+                "username": {
+                    "_self": {"mapping_to": "username"}
+                },
+                "password": {
+                    "_self": {"mapping_to": "password"}
                 }
             }
         },
@@ -123,25 +151,34 @@ adapter_test_config = {
 
 
 cluster_test_config = {
-    "cluster_id": 1,
+    "id": 1,
     "os_version": "Ubuntu-12.04-x86_64",
-    "cluster_name": "test",
+    "name": "test",
     "os_config": {
         "general": {
             "language": "EN",
             "timezone": "UTC",
-            "default_gateway": "192.168.2.1",
-            "domain": "ods.com"
+            "default_gateway": "12.234.32.1",
+            "domain": "ods.com",
+            "http_proxy": "http://127.0.0.1:3128",
+            "https_proxy": "",
+            "ntp_server": "127.0.0.1",
+            "dns_servers": ["127.0.0.1"],
+            "search_path": ["1.ods.com", "ods.com"]
         },
         "partition": {
             "/var": {
-                "max_size": "20",
-                "size_percentage": "20%"
+                "max_size": 20,
+                "size_percentage": 20
             },
             "/home": {
-                "max_size": "50",
-                "size_percentage": "40%"
+                "max_size": 50,
+                "size_percentage": 40
             }
+        },
+        "server_credentials": {
+            "username": "root",
+            "password": "huawei"
         }
     },
     "package_config": {
@@ -171,25 +208,23 @@ hosts_test_config = {
     1: {
         "host_id": 1,
         "reinstall_os": True,
-        "os_version": "Ubuntu-12.04-x86_64",
-        "mac_address": "mac_01",
-        "name": "server01",
+        "mac": "00:0c:29:3e:60:e9",
+        "name": "server01.test",
+        "hostname": "server01",
         "networks": {
-            "interfaces": {
-                "vnet0": {
-                    "ip": "192.168.1.1",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": True,
-                    "is_promiscuous": False,
-                    "subnet": "192.168.1.0/24"
-                },
-                "vnet1": {
-                    "ip": "172.16.1.1",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": False,
-                    "is_promiscuous": True,
-                    "subnet": "172.16.1.0/24"
-                }
+            "vnet0": {
+                "ip": "12.234.32.100",
+                "netmask": "255.255.255.0",
+                "is_mgmt": True,
+                "is_promiscuous": False,
+                "subnet": "12.234.32.0/24"
+            },
+            "vnet1": {
+                "ip": "172.16.1.1",
+                "netmask": "255.255.255.0",
+                "is_mgmt": False,
+                "is_promiscuous": False,
+                "subnet": "172.16.1.0/24"
             }
         },
         "os_config": {
@@ -198,12 +233,12 @@ hosts_test_config = {
             },
             "partition": {
                 "/var": {
-                    "max_size": "20",
-                    "size_percentage": "20%"
+                    "max_size": 30,
+                    "size_percentage": 30
                 },
-                "/home": {
-                    "max_size": "50",
-                    "size_percentage": "40%"
+                "/test": {
+                    "max_size": 10,
+                    "size_percentage": 10
                 }
             }
         },
@@ -222,43 +257,36 @@ hosts_test_config = {
     2: {
         "host_id": 2,
         "reinstall_os": True,
-        "os_version": "Ubuntu-12.04-x86_64",
-        "mac_address": "mac_02",
-        "name": "server02",
+        "mac": "00:0c:29:3e:60:a1",
+        "name": "server02.test",
+        "hostname": "server02",
         "networks": {
-            "interfaces": {
-                "eth0": {
-                    "ip": "192.168.1.2",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": True,
-                    "is_promiscuous": False,
-                    "subnet": "192.168.1.0/24"
-                },
-                "eth1": {
-                    "ip": "172.16.1.2",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": False,
-                    "is_promiscuous": False,
-                    "subnet": "172.16.1.0/24"
-                }
+            "eth0": {
+                "ip": "12.234.32.101",
+                "netmask": "255.255.255.0",
+                "is_mgmt": True,
+                "is_promiscuous": False,
+                "subnet": "12.234.32.0/24"
+            },
+            "eth1": {
+                "ip": "172.16.1.2",
+                "netmask": "255.255.255.0",
+                "is_mgmt": False,
+                "is_promiscuous": False,
+                "subnet": "172.16.1.0/24"
             }
         },
         "os_config": {
             "general": {
                 "language": "EN",
                 "timezone": "UTC",
-                "default_gateway": "192.168.2.1",
                 "domain": "ods.com"
             },
             "partition": {
-                "/var": {
-                    "max_size": "20",
-                    "size_percentage": "20%"
-                },
-                "/home": {
-                    "max_size": "50",
-                    "size_percentage": "40%"
-                }
+                "/test": {
+                    "max_size": 10,
+                    "size_percentage": 20
+               }
             }
         },
         "package_config": {
@@ -266,51 +294,54 @@ hosts_test_config = {
         }
     },
     3: {
-        "host_id": 3,
+        "host_id": 10,
         "reinstall_os": False,
-        "os_version": "Ubuntu-12.04-x86_64",
-        "mac_address": "mac_03",
-        "name": "server03",
+        "mac_address": "00:0c:29:3e:60:a2",
+        "name": "server03.test",
+        "hostname": "server03",
         "networks": {
-            "interfaces": {
-                "eth0": {
-                    "ip": "192.168.1.3",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": True,
-                    "is_promiscuous": False,
-                    "subnet": "192.168.1.0/24"
-                },
-                "eth1": {
-                    "ip": "172.16.1.3",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": False,
-                    "is_promiscuous": False,
-                    "subnet": "172.16.1.0/24"
-                },
-                "eth2": {
-                    "ip": "10.0.0.1",
-                    "netmask": "255.255.255.0",
-                    "is_mgmt": False,
-                    "is_promiscuous": True,
-                    "subnet": "10.0.0.0/24"
-                }
+            "eth0": {
+                "ip": "12.234.32.103",
+                "netmask": "255.255.255.0",
+                "is_mgmt": True,
+                "is_promiscuous": False,
+                "subnet": "12.234.32.0/24"
+            },
+            "eth1": {
+                "ip": "172.16.1.3",
+                "netmask": "255.255.255.0",
+                "is_mgmt": False,
+                "is_promiscuous": False,
+                "subnet": "172.16.1.0/24"
+            },
+            "eth2": {
+                "ip": "10.0.0.1",
+                "netmask": "255.255.255.0",
+                "is_mgmt": False,
+                "is_promiscuous": True,
+                "subnet": "10.0.0.0/24"
             }
         },
         "os_config": {
             "general": {
                 "language": "EN",
                 "timezone": "UTC",
-                "default_gateway": "192.168.2.1",
-                "domain": "ods.com"
+                "default_gateway": "12.234.32.1",
+                "domain": "ods.com",
+                "http_proxy": "http://10.145.88.211:3128",
+                "https_proxy": "",
+                "ntp_server": "10.145.88.211",
+                "dns_servers": "10.145.88.211",
+                "search_path": "1.ods.com ods.com"
             },
             "partition": {
                 "/var": {
-                    "max_size": "20",
-                    "size_percentage": "20%"
+                    "max_size": 20,
+                    "size_percentage": 20
                 },
                 "/home": {
-                    "max_size": "50",
-                    "size_percentage": "40%"
+                    "max_size": 50,
+                    "size_percentage": 40
                 }
             }
         },

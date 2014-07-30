@@ -19,7 +19,7 @@ import shutil
 
 from compass.deployment.installers.config_manager import BaseConfigManager
 from compass.deployment.installers.installer import PKInstaller
-from compass.deployment.utils import constants
+from compass.deployment.utils import constants as const
 from compass.utils import setting_wrapper as setting
 from compass.utils import util
 
@@ -31,15 +31,15 @@ class ChefInstaller(PKInstaller):
     """chef package installer."""
     ENV_TMPL_NAME = 'env.tmpl'
     NODE_TMPL_DIR = 'node'
+    DATABAG_TMPL_DIR = 'databags'
     COMMON_NODE_TMPL_NAME = 'node.tmpl'
-    DATABAGITEM_TMPL_NAME = 'databagitem.tmpl'
 
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(ChefInstaller, self).__init__()
 
         self.config_manager = ChefConfigManager(adapter_info, cluster_info,
                                                 hosts_info)
-        self.tmpl_dir = self.config_manager.get_target_system_tmpl_dir()
+        self.tmpl_dir = self.config_manager.get_dist_system_tmpl_dir()
         self.installer_url_ = self.config_manager.get_chef_url()
         key, client = self.config_manager.get_chef_credentials()
 
@@ -67,24 +67,20 @@ class ChefInstaller(PKInstaller):
 
         return chef_api
 
-    def get_env_name(self, adapter_name, cluster_id):
+    def get_env_name(self, dist_sys_name, cluster_id):
         """Generate environment name."""
-        return "-".join((adapter_name, cluster_id))
-
-    def get_databagitem_name(self):
-        """Generate databagitem name."""
-        return self.config_manager.get_clustername()
+        return "-".join((dist_sys_name, cluster_id))
 
     def get_databag_name(self):
         """Get databag name."""
-        return self.config_manager.get_adapter_name()
+        return self.config_manager.get_dist_system_name()
 
     def get_databag(self, databag_name):
+        """Get databag object from chef server. Creating the databag if its
+           doesnot exist.
+        """
         import chef
         bag = chef.DataBag(databag_name, api=self.api_)
-
-        # TODO(grace): Why do we need to save() here?
-        # This is a getter method. Or is this a create()?
         bag.save()
         return bag
 
@@ -101,7 +97,6 @@ class ChefInstaller(PKInstaller):
             raise Exception("Cannot find ChefAPI object!")
 
         node = chef.Node(node_name, api=self.api_)
-        # TODO(grace): Same as above
         if node not in chef.Node.list(api=self.api_):
             if env_name:
                 node.chef_environment = env_name
@@ -115,7 +110,7 @@ class ChefInstaller(PKInstaller):
             self.delete_node(host_id)
 
     def delete_node(self, host_id):
-        fullname = self.config_manager.get_host_fullname(host_id)
+        fullname = self.config_manager.get_host_name(host_id)
         node = self.get_node(fullname)
         self._delete_node(node)
 
@@ -228,47 +223,48 @@ class ChefInstaller(PKInstaller):
                 setattr(env, attr, env_config[attr])
         env.save()
 
-    def _get_databagitem_attributes(self, vars_dict):
-        databagitem_tmpl_dir = os.path.join(self.tmpl_dir,
-                                            self.DATABAGITEM_TMPL_NAME)
-        databagitem_attri = self.get_config_from_template(databagitem_tmpl_dir,
+    def _get_databagitem_attributes(self, tmpl_dir, vars_dict):
+        databagitem_attri = self.get_config_from_template(tmpl_dir,
                                                           vars_dict)
 
         return databagitem_attri
 
-    def update_databag(self, databag, item_name, vars_dict):
+    def update_databags(self, vars_dict):
         """Update datbag item attributes.
 
-           :param object databag: The databag object.
-           :param str item_name: The databag item name.
            :param dict vars_dict: The dictionary used to get attributes from
                                   templates.
         """
-        if databag is None:
-            logging.info("Databag object is None, will not update it!")
-            return
+        databag_names = self.config_manager.get_chef_databag_names()
+        if not databag_names:
+            return 
 
         import chef
-        databagitem_attri = self._get_databagitem_attributes(vars_dict)
-        databagitem = chef.DataBagItem(databag, item_name, api=self.api_)
+        databags_dir = os.path.join(self.tmpl_dir, self.DATABAG_TMPL_DIR)
+        for databag_name in databag_names:
+            databag = self.get_databag(databag_name)
+            databag_tmpl = os.paht.join(databags_dir, databag_name)
+            databagitem_attri = self._get_databagitem_attributes(databag_tmpl,
+                                                                 vars_dict)
+            
+            for item, item_values in databagitem_attri.iteritems():
+                databagitem = chef.DataBagItem(databag, item, api=self.api_)
+                for key, value in item_values.iteritems():
+                    databagitem[key] = value
+                databagitem.save()
 
-        for key, value in databagitem_attri.iteritems():
-            databagitem[key] = value
-
-        databagitem.save()
-
-    def _get_host_tmpl_vars(self, host_id, cluster_vars_dict):
+    def _get_host_tmpl_vars(self, host_id, global_vars_dict):
         """Get templates variables dictionary for cheetah searchList based
            on host package config.
 
            :param int host_id: The host ID.
-           :param dict cluster_vars_dict: The vars_dict got from cluster level
-                                          package_config.
+           :param dict global_vars_dict: The vars_dict got from cluster level
+                                         package_config.
         """
         vars_dict = {}
-        if cluster_vars_dict:
-            temp_dict = cluster_vars_dict['cluster'][constants.DEPLOY_PK_CONFIG]
-            vars_dict[constants.DEPLOY_PK_CONFIG] = temp_dict
+        if global_vars_dict:
+            temp_dict = global_vars_dict[const.CLUSTER][const.DEPLOY_PK_CONFIG]
+            vars_dict[const.DEPLOY_PK_CONFIG] = temp_dict
 
         host_baseinfo = self.config_manager.get_host_baseinfo(host_id)
         util.merge_dict(vars_dict, host_baseinfo)
@@ -278,13 +274,13 @@ class ChefInstaller(PKInstaller):
             # Get host template variables and merge to vars_dict
             metadata = self.config_manager.get_pk_config_meatadata()
             host_dict = self.get_tmpl_vars_from_metadata(metadata, pk_config)
-            util.merge_dict(vars_dict[constants.DEPLOY_PK_CONFIG], host_dict)
+            util.merge_dict(vars_dict[const.DEPLOY_PK_CONFIG], host_dict)
 
         # Set role_mapping for host
         roles_mapping = self.config_manager.get_host_roles_mapping(host_id)
-        vars_dict[constants.DEPLOY_PK_CONFIG][constants.ROLES_MAPPING] = roles_mapping
+        vars_dict[const.DEPLOY_PK_CONFIG][const.ROLES_MAPPING] = roles_mapping
 
-        return {'host': vars_dict}
+        return {const.HOST: vars_dict}
 
     def _get_cluster_tmpl_vars(self):
         vars_dict = {}
@@ -294,12 +290,12 @@ class ChefInstaller(PKInstaller):
         pk_metadata = self.config_manager.get_pk_config_meatadata()
         pk_config = self.config_manager.get_cluster_package_config()
         meta_dict = self.get_tmpl_vars_from_metadata(pk_metadata, pk_config)
-        vars_dict[constants.DEPLOY_PK_CONFIG] = meta_dict
+        vars_dict[const.DEPLOY_PK_CONFIG] = meta_dict
 
         roles_mapping = self.config_manager.get_cluster_roles_mapping()
-        vars_dict[constants.DEPLOY_PK_CONFIG][constants.ROLES_MAPPING] = roles_mapping
+        vars_dict[const.DEPLOY_PK_CONFIG][const.ROLES_MAPPING] = roles_mapping
 
-        return {'cluster': vars_dict}
+        return {const.CLUSTER: vars_dict}
 
     def deploy(self):
         """Start to deploy system."""
@@ -312,14 +308,11 @@ class ChefInstaller(PKInstaller):
         self.update_environment(env_name, global_vars_dict)
 
         #Update Databag item
-        #databag_name = self.get_databag_name()
-        #item_name = self.get_databagitem_name()
-        #databag = self.get_databag(databag_name)
-        #self.update_databag(databag, item_name, global_vars_dict)
+        self.update_databags(global_vars_dict)
 
         host_list = self.config_manager.get_host_id_list()
         for host_id in host_list:
-            node_name = self.config_manager.get_host_fullname(host_id)
+            node_name = self.config_manager.get_host_name(host_id)
             roles = self.config_manager.get_host_roles(host_id)
 
             node = self.get_node(node_name)
@@ -332,11 +325,11 @@ class ChefInstaller(PKInstaller):
            OS is installed successfully.
            The output format:
            {
-              '1'($host_id):{
+              '1'($host_id/clusterhost_id):{
                   'tool': 'chef',
                   'chef_url': 'https://xxx',
-                  'chef_client_name': '$host_fullname',
-                  'chef_node_name': '$host_fullname'
+                  'chef_client_name': '$host_name',
+                  'chef_node_name': '$host_name'
               },
               .....
            }
@@ -344,7 +337,7 @@ class ChefInstaller(PKInstaller):
         host_ids = self.config_manager.get_host_id_list()
         os_installer_configs = {}
         for host_id in host_ids:
-            fullname = self.config_manager.get_host_fullname(host_id)
+            fullname = self.config_manager.get_host_name(host_id)
             temp = {
                 "tool": "chef",
                 "chef_url": self.installer_url_
@@ -360,14 +353,14 @@ class ChefInstaller(PKInstaller):
         log_dir_prefix = setting.INSTALLATION_LOGDIR[self.NAME]
         hosts_list = self.config_manager.get_host_id_list()
         for host_id in hosts_list:
-            fullname = self.config_manager.get_host_fullname()
+            fullname = self.config_manager.get_host_name()
             self._clean_log(log_dir_prefix, fullname)
 
     def _clean_log(self, log_dir_prefix, node_name):
         log_dir = os.path.join(log_dir_prefix, node_name)
         shutil.rmtree(log_dir, True)
 
-    def get_supported_target_systems(self):
+    def get_supported_dist_systems(self):
         """get target systems from chef. All target_systems for compass will
            be stored in the databag called "compass".
         """
@@ -402,8 +395,8 @@ class ChefInstaller(PKInstaller):
 
 class ChefConfigManager(BaseConfigManager):
     TMPL_DIR = 'tmpl_dir'
-    DATABAG_NAME = "databag"
-    CHEFSERVER_URL = "chef_server_host"
+    DATABAGS = "databags"
+    CHEFSERVER_URL = "chef_url"
     KEY_DIR = "key_dir"
     CLIENT = "client_name"
 
@@ -412,7 +405,7 @@ class ChefConfigManager(BaseConfigManager):
                                                 cluster_info,
                                                 hosts_info)
 
-    def get_target_system_tmpl_dir(self):
+    def get_dist_system_tmpl_dir(self):
         pk_installer_settings = self.get_pk_installer_settings()
         if self.TMPL_DIR not in pk_installer_settings:
             raise KeyError("'%s' must be set in package settings!",
@@ -436,3 +429,11 @@ class ChefConfigManager(BaseConfigManager):
             return cred
 
         return (None, None)
+
+    def get_chef_databag_names(self):
+        pk_installer_settings = self.get_pk_installer_settings()
+        if self.DATABAGS in pk_installer_settings:
+            logging.info("No databags is set!")
+            return None
+
+        return pk_installer_settings[self.DATABAGS]

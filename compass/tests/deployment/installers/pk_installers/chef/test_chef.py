@@ -64,7 +64,7 @@ class TestChefInstaller(unittest2.TestCase):
             "override_attributes": {
                 "endpoints": {
                     "compute-vnc-bind": {
-                        "host": "192.168.1.2"
+                        "host": "12.234.32.101"
                     }
                 }
             }
@@ -101,10 +101,10 @@ class TestChefInstaller(unittest2.TestCase):
                 "db": {
                     "bind_interface": "vnet0",
                     "compute": {
-                      "host": "192.168.1.1"
+                      "host": "12.234.32.100"
                     },
                     "identity": {
-                      "host": "192.168.1.1"
+                      "host": "12.234.32.100"
                     }
                 },
                 "mq": {

@@ -38,45 +38,54 @@ class TestCobblerInstaller(unittest2.TestCase):
         self.test_cobbler = self._get_cobbler_installer()
         self.expected_host_vars_dict = {
             "host": {
-                "host_id": 1,
-                "mac_address": "mac_01",
-                "fullname": "server01.test",
+                "mac": "00:0c:29:3e:60:e9",
+                "name": "server01.test",
                 "profile": "Ubuntu-12.04-x86_64",
-                "name": "server01",
+                "hostname": "server01",
                 "dns": "server01.test.ods.com",
-                "os_version": "Ubuntu-12.04-x86_64",
                 "reinstall_os": True,
                 "networks": {
-                    "interfaces": {
-                        "vnet0": {
-                            "ip": "192.168.1.1",
-                            "netmask": "255.255.255.0",
-                            "is_mgmt": True,
-                            "is_promiscuous": False,
-                            "subnet": "192.168.1.0/24"
-                        },
-                        "vnet1": {
-                            "ip": "172.16.1.1",
-                            "netmask": "255.255.255.0",
-                            "is_mgmt": False,
-                            "is_promiscuous": True,
-                            "subnet": "172.16.1.0/24"
-                        }
+                    "vnet0": {
+                        "ip": "12.234.32.100",
+                        "netmask": "255.255.255.0",
+                        "is_mgmt": True,
+                        "is_promiscuous": False,
+                        "subnet": "12.234.32.0/24"
+                    },
+                    "vnet1": {
+                        "ip": "172.16.1.1",
+                        "netmask": "255.255.255.0",
+                        "is_mgmt": False,
+                        "is_promiscuous": False,
+                        "subnet": "172.16.1.0/24"
                     }
                 },
                 "partition": {
                     "/var": {
-                        "vol_size": "20",
-                        "vol_percentage": "20%"
+                        "vol_size": 30,
+                        "vol_percentage": 30
                     },
                     "/home": {
-                        "vol_size": "50",
-                        "vol_percentage": "40%"
+                        "vol_size": 50,
+                        "vol_percentage": 40
+                    },
+                    "/test": {
+                        "vol_size": 10,
+                        "vol_percentage": 10
                     }
                 },
+                "server_credentials": {
+                    "username": "root",
+                    "password": "huawei"
+                },
                 "language": "EN",
-                "gateway": "10.145.88.1",
-                "timezone": "UTC"
+                "timezone": "UTC",
+                "http_proxy": "http://127.0.0.1:3128",
+                "https_proxy": "",
+                "ntp_server": "127.0.0.1",
+                "nameservers": ["127.0.0.1"],
+                "search_path": ["1.ods.com", "ods.com"],
+                "gateway": "10.145.88.1"
             }
         }
 
@@ -109,15 +118,18 @@ class TestCobblerInstaller(unittest2.TestCase):
 
     def test_get_system_config(self):
         expected_system_config = {
-            "name": "server01",
+            "name": "server01.test",
             "hostname": "server01",
             "profile": "Ubuntu-12.04-x86_64",
             "gateway": "10.145.88.1",
+            "name_servers": ["127.0.0.1"],
+            "name_servers_search": "1.ods.com ods.com",
+            "proxy": "http://127.0.0.1:3128",
             "modify_interface": {
-                "ipaddress-vnet0": "192.168.1.1",
+                "ipaddress-vnet0": "12.234.32.100",
                 "netmask-vnet0": "255.255.255.0",
                 "management-vnet0": True,
-                "macaddress-vnet0": "mac_01",
+                "macaddress-vnet0": "00:0c:29:3e:60:e9",
                 "dns-vnet0": "server01.test.ods.com",
                 "static-vnet0": True,
                 "ipaddress-vnet1": "172.16.1.1",
@@ -126,8 +138,11 @@ class TestCobblerInstaller(unittest2.TestCase):
                 "static-vnet1": True
             },
             "ksmeta":{
+                "promisc_nics": "",
                 "timezone" : "UTC",
-                "partition": "/var 20%;/home 40%",
+                "partition": "/test 10%;/var 30%;/home 40%",
+                "https_proxy": "",
+                "ntp_server": "127.0.0.1",
                 "chef_url": "https://127.0.0.1",
                 "chef_client_name": "server01.test",
                 "chef_node_name": "server01.test",

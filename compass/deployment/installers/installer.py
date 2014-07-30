@@ -52,44 +52,20 @@ class BaseInstaller(object):
 
         return template_vars
 
-    # TODO(grace): I have slightly modified this impl.
-    # Please decide which one to use.
-    def _get_tmpl_vars_helper2(self, metadata, config, output):
-        for key, config_value in config.iteritems():
-            if key in metadata:
-                sub_meta = metadata[key]
-                try:
-                    mapping_to_value = sub_meta['_self']['mapping_to']
-                except KeyError:
-                    mapping_to_value = None
+    def _get_key_mapping(self, metadata, key, is_regular_key):
+        """Get the keyword which the input key maps to. This keyword will be
+           added to dictionary used to render templates.
 
-                if mapping_to_value:
-                    mapping_to = sub_meta['_self']['mapping_to']
-                    if isinstance(config_value, dict):
-                        output[mapping_to] = {}
-                        self._get_tmpl_vars_helper(sub_meta, config_value,
-                                                   output[mapping_to])
-                    else:
-                        output[mapping_to] = config_value
-                elif isinstance(config_value, dict):
-                    self._get_tmpl_vars_helper(sub_meta, config_value,
-                                               output)
-            else:
-                temp = deepcopy(metadata)
-                del temp['_self']
-                meta_key = temp.keys()[0]
-                if meta_key.startswith("$"):
-                    sub_meta = metadata[meta_key]
-                    if isinstance(config_value, dict):
-                        output[key] = {}
-                        self._get_tmpl_vars_helper(sub_meta, config_value,
-                                                   output[key])
-                    else:
-                        output[key] = config_value
-                else:
-                    raise KeyError("'%s' is an invalid metadata!" % key)
-        
-    def _get_key_mapping(self, is_regular_key, metadata, key):
+           If the key in metadata has a mapping to another keyword which is 
+           used for templates, then return this keyword. If the key is started
+           with '$', which is a variable in metadata, return the key itself as
+           the mapping keyword. If the key has no mapping, return None.
+
+           :param dict metadata: metadata/submetadata dictionary.
+           :param str key: The keyword defined in metadata.
+           :param bool is_regular_key: False when the key defined in metadata
+                                       is a variable(starting with '$').
+        """
         mapping_to = key
         if is_regular_key:
             try:
@@ -99,6 +75,13 @@ class BaseInstaller(object):
         return mapping_to
 
     def _get_submeta_by_key(self, metadata, key):
+        """Get submetadata dictionary based on current metadata key. And
+           determines the input key is a regular string keyword or a variable
+           keyword defined in metadata, which starts with '$'.
+
+           :param dict metadata: The metadata dictionary.
+           :param str key: The keyword defined in the metadata.
+        """
         if key in metadata:
             return (True, metadata[key])
     
@@ -112,8 +95,8 @@ class BaseInstaller(object):
 
     def _get_tmpl_vars_helper(self, metadata, config, output):
         for key, config_value in config.iteritems():
-            regular_key, sub_meta = self._get_submeta_by_key(metadata, key)
-            mapping_to = self._get_key_mapping(regular_key, sub_meta, key)
+            is_regular_key, sub_meta = self._get_submeta_by_key(metadata, key)
+            mapping_to = self._get_key_mapping(sub_meta, key, is_regular_key)
 
             if isinstance(config_value, dict):
                 if mapping_to:
@@ -138,6 +121,7 @@ class BaseInstaller(object):
 
     @classmethod
     def get_installer(cls, name, path, **kwargs):
+        installer = None
         try:
             mod_file, path, descr = imp.find_module(name, [path])
             if mod_file:

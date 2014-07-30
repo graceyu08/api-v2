@@ -24,8 +24,6 @@ from compass.utils import util
 
 class BaseConfigManager(object):
 
-    # TODO(grace): A question here: will the deployed_config
-    # be part of cluster_info or hosts_info?
     def __init__(self, adapter_info, cluster_info, hosts_info):
         self.adapter_info = adapter_info
         self.cluster_info = cluster_info
@@ -36,13 +34,13 @@ class BaseConfigManager(object):
             logging.info("cluster config is None or {}")
             return None
 
-        return self.cluster_info[const.CLUSTER_ID]
+        return self.cluster_info[const.ID]
 
     def get_clustername(self):
         if not self.cluster_info:
             logging.info("cluster config is None or {}")
             return None
-        return self.cluster_info[const.CLUSTER_NAME]
+        return self.cluster_info[const.NAME]
 
     def get_os_version(self):
         if not self.cluster_info:
@@ -58,8 +56,7 @@ class BaseConfigManager(object):
             logging.info("cluster config is None or {}")
             return None
 
-        attr_names = [const.CLUSTER_ID, const.CLUSTER_NAME,
-                      const.OS_VERSION]
+        attr_names = [const.ID, const.NAME, const.OS_VERSION]
 
         base_info = {}
         for name in attr_names:
@@ -120,15 +117,14 @@ class BaseConfigManager(object):
 
         return self.cluster_info[const.DEPLOY_PK_CONFIG]
 
-    # TODO(grace): shall this be called merge rather than set?
-    def set_cluster_deploy_os_config(self, deploy_os_config):
+    def merge_cluster_deploy_os_config(self, deploy_os_config):
         if deploy_os_config is None:
             return
 
         config = self.get_cluster_deploy_os_config()
         util.merge_dict(config, deploy_os_config)
 
-    def set_cluster_deploy_package_config(self, deploy_pk_config):
+    def merge_cluster_deploy_package_config(self, deploy_pk_config):
         if deploy_pk_config is None:
             return
 
@@ -167,8 +163,8 @@ class BaseConfigManager(object):
         if not host_info:
             return None
 
-        attr_names = [const.REINSTALL_OS_FLAG, const.OS_VERSION,
-                      const.MAC_ADDR, const.HOSTNAME, const.NETWORKS]
+        attr_names = [const.REINSTALL_OS_FLAG, const.MAC_ADDR, const.NAME,
+                      const.HOSTNAME, const.NETWORKS]
         base_info = {}
         for attr in attr_names:
             temp = host_info[attr]
@@ -177,48 +173,50 @@ class BaseConfigManager(object):
             else:
                 base_info[attr] = temp
 
-        base_info[const.HOST_ID] = host_id
-        base_info[const.FULLNAME] = self.get_host_fullname(host_id)
         base_info[const.DNS] = self.get_host_dns(host_id)
 
         return base_info
 
-    def get_host_fullname(self, host_id):
-        if not self._get_host_info(host_id):
+    def get_host_orig_cluster_id(self, host_id):
+        host_info = self._get_host_info(host_id)
+
+        if not host_info:
+            logging.info("Cannot find the host with ID %s", host_id)
             return None
 
-        host_info = self._get_host_info(host_id)
-        if const.FULLNAME  not in host_info:
-            hostname = self.get_hostname(host_id)
-            clustname = self.get_clustername()
-            host_info[const.FULLNAME] = '.'.join((hostname, clustname))
+        return host_info[const.ORIGIN_CLUSTER_ID]
 
-        return host_info[const.FULLNAME]
+    def get_host_name(self, host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
+            return None
+
+        return host_info[const.NAME]
 
     def get_host_dns(self, host_id):
-        if not self._get_host_info(host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
             return None
 
-        host_info = self._get_host_info(host_id)
         if const.DNS not in host_info:
-            fullname = self.get_host_fullname(host_id)
+            name = host_info[const.NAME]
             domain = self.get_host_domain(host_id)
-            host_info[const.DNS] = '.'.join((fullname, domain))
+            host_info[const.DNS] = '.'.join((name, domain))
 
         return host_info[const.DNS]
 
     def get_host_mac_address(self, host_id):
-        if not self._get_host_info(host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
             return None
 
-        host_info = self._get_host_info(host_id)
         return host_info[const.MAC_ADDR]
 
     def get_hostname(self, host_id):
-        if not self._get_host_info(host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
             return None
 
-        host_info = self._get_host_info(host_id)
         return host_info[const.HOSTNAME]
 
     def get_host_networks(self, host_id):
@@ -233,7 +231,7 @@ class BaseConfigManager(object):
         if not networks:
             return None
 
-        nic_names = networks[const.INTERFACES].keys()
+        nic_names = networks.keys()
         return nic_names
 
     def get_host_interface_config(self, host_id, interface):
@@ -241,25 +239,24 @@ class BaseConfigManager(object):
         if not networks:
             return None
 
-        interfaces = networks[const.INTERFACES]
-        if interface not in interfaces:
+        if interface not in networks:
            logging.info("Cannot find NIC '%s'", interface)
            return None
 
-        return deepcopy(interfaces[interface])
+        return deepcopy(networks[interface])
 
     def get_host_interface_ip(self, host_id, interface):
-        if not self._get_host_interface_config(host_id, interface):
+        interface_config = self._get_host_interface_config(host_id, interface)
+        if not interface_config:
             return None
 
-        interface_config = self.get_host_interface_config(host_id, interface)
         return interface_config[const.IP_ADDR]
 
     def get_host_interface_netmask(self, host_id, interface):
-        if not self.get_host_interface_config(host_id, interface):
+        interface_config = self.get_host_interface_config(host_id, interface)
+        if not interface_config:
             return None
 
-        interface_config = self.get_host_interface_config(host_id, interface)
         return interface_config[const.NETMASK]
 
     def get_host_interface_subnet(self, host_id, interface):
@@ -284,10 +281,10 @@ class BaseConfigManager(object):
         return nic_config[const.MGMT_NIC_FLAG]
 
     def get_host_os_config(self, host_id):
-        if not self._get_host_info(host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
             return None
 
-        host_info = self._get_host_info(host_id)
         return deepcopy(host_info[const.OS_CONFIG])
 
     def get_host_domain(self, host_id):
@@ -313,10 +310,10 @@ class BaseConfigManager(object):
         return network_mapping
 
     def get_host_package_config(self, host_id):
-        if not self._get_host_info(host_id):
+        host_info = self._get_host_info(host_id)
+        if not host_info:
             return None
 
-        host_info = self._get_host_info(host_id)
         return deepcopy(host_info[const.PK_CONFIG])
 
     def get_host_deploy_os_config(self, host_id):
@@ -329,7 +326,7 @@ class BaseConfigManager(object):
 
         return host_info[const.DEPLOY_OS_CONFIG]
 
-    def set_host_deploy_os_config(self, host_id, deploy_config):
+    def merge_host_deploy_os_config(self, host_id, deploy_config):
         if deploy_config is None:
             return
 
@@ -346,9 +343,10 @@ class BaseConfigManager(object):
 
         return host_info[const.DEPLOY_PK_CONFIG]
 
-    def set_host_deploy_package_config(self, host_id, deploy_config):
+    def merge_host_deploy_package_config(self, host_id, deploy_config):
         if deploy_config is None:
             return
+
         config = self.get_host_deploy_package_config(host_id)
         util.merge_dict(config, deploy_config)
 
@@ -370,21 +368,52 @@ class BaseConfigManager(object):
         return roles_mapping
 
     def get_adapter_name(self):
-        return self.adapter_info[const.ADAPTER_NAME]
+        if not self.adapter_info:
+            logging.info("Adapter Info is None!")
+            return None
+
+        return self.adapter_info[const.NAME]
+
+    def get_dist_system_name(self):
+        if not self.adapter_info:
+            logging.info("Adapter Info is None!")
+            return None
+   
+        return self.adapter_info[const.DIST_SYS_NAME]
 
     def get_adapter_roles(self):
+        if not self.adapter_info:                                                 
+            logging.info("Adapter Info is None!")                                 
+            return None
+ 
         return self.adapter_info[const.ROLES]
 
     def get_os_installer_settings(self):
+        if not self.adapter_info:                                                 
+            logging.info("Adapter Info is None!")                                 
+            return None
+  
         return self.adapter_info[const.OS_INSTALLER][const.INSTALLER_SETTINGS]
 
     def get_pk_installer_settings(self):
+        if not self.adapter_info:                                                 
+            logging.info("Adapter Info is None!")                                 
+            return None
+
         return self.adapter_info[const.PK_INSTALLER][const.INSTALLER_SETTINGS]
 
     def get_os_config_metadata(self):
+        if not self.adapter_info:                                                 
+            logging.info("Adapter Info is None!")                                 
+            return None
+
         return self.adapter_info[const.METADATA][const.OS_CONFIG]
 
     def get_pk_config_meatadata(self):
+        if not self.adapter_info:                                                 
+            logging.info("Adapter Info is None!")                                 
+            return None
+
         return self.adapter_info[const.METADATA][const.PK_CONFIG]
 
     def _get_cluster_roles_mapping_helper(self):

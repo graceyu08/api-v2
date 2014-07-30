@@ -17,12 +17,12 @@
 import logging
 
 from compass.actions import util
-from compass.db import db_api
+from compass.db import api as db_api
 from compass.deployment.deploy_manager import DeployManager
-from compass.deployment.deploy_manager import PowerManager
+from compass.deployment.utils import constants as const
 
 
-def deploy(cluster_id, hosts_id_list):
+def deploy(cluster_id, hosts_id_list, user=None):
     """Deploy clusters.
 
     :param cluster_hosts: clusters and hosts in each cluster to deploy.
@@ -35,16 +35,18 @@ def deploy(cluster_id, hosts_id_list):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
-        adapter_info = __get_adapter_info(cluster_id)
-        cluster_info = __get_cluster_info(cluster_id)
-        hosts_info = __get_hosts_details(hosts_id_list)
+        cluster_info = __get_cluster_info(cluster_id, user)
+        adapter_id = cluster_info[const.ADAPTER_ID]
+
+        adapter_info = __get_adapter_info(adapter_id, cluster_id, user)
+        hosts_info = __get_hosts_info(hosts_id_list, user)
 
         deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
         deploy_manager.prepare_for_deploy()
         deploy_manager.deploy()
 
 
-def redeploy(cluster_id, hosts_id_list):
+def redeploy(cluster_id, hosts_id_list, user=None):
     """Deploy clusters.
 
     :param cluster_hosts: clusters and hosts in each cluster to deploy.
@@ -54,9 +56,11 @@ def redeploy(cluster_id, hosts_id_list):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
-        adapter_info = __get_adapter_info(cluster_id)
         cluster_info = __get_cluster_info(cluster_id)
-        hosts_info = __get_hosts_details(cluster_id, hosts_id_list)
+        adapter_id = cluster_info[const.ADAPTER_ID] 
+
+        adapter_info = __get_adapter_info(adapter_id, cluster_id, user)
+        hosts_info = __get_hosts_info(cluster_id, hosts_id_list, user)
 
         deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
         deploy_manager.prepare_for_deploy()
@@ -65,22 +69,21 @@ def redeploy(cluster_id, hosts_id_list):
 
 def poweron(host_id):
     """Power on a list of hosts."""
-    with util.lock('serialized_action') as lock:
-        if not lock:
-            raise Exception('failed to acquire lock to deploy')
+    pass
 
-        ipmi_info = __get_single_host_ipmi(host_id)
-        host_baseinfo = __get_hosts_baseinfo()
-        origin_cluster_id = 
-        adapter_info = __get_adapter_info(cluster_id)
-        hosts_ipmi_info = __get_hosts_ipmi_info(hosts_id_list)
+def poweroff(host_id):
+    pass
+
+def reset(host_id):
+    pass
 
 
-def __get_adapter_info(cluster_id):
+def __get_adapter_info(adapter_id, cluster_id, user):
         """Get adapter information. Return a dictionary as below,
            {
-              "adapter_name": "xxx",
-              "roles": [...],
+              "id": 1,
+              "name": "xxx",
+              "roles": ['xxx', 'yyy', ...],
               "metadata": {
                   "os_config": {
                       ...
@@ -96,56 +99,65 @@ def __get_adapter_info(cluster_id):
               "pk_installer": {
                   "name": "chef",
                   "settings": {....}
-              }
+              },
+              ...
            }
+           To view a complete output, please refer to backend doc.
         """
-        pass
+        adapter_info = db_api.adapter_holder.get_adapter(user, adapter_id)
+        metadata = db_api.cluster.get_cluster_metadata(user, cluster_id)
+        adapter_info.update(metadata)
 
-def __get_cluster_info(cluster_id):
+        roles_info = adapter_info[const.ROLES]
+        roles_list = [role[const.NAME] for role in roles_info]
+        adapter_info[const.ROLES] = roles_list
+
+        return adapter_info
+
+def __get_cluster_info(cluster_id, user):
     """Get cluster information.Return a dictionary as below,
        {
            "cluster": {
-               "cluster_id": 1,
+               "id": 1,
+               "adapter_id": 1,
                "os_version": "CentOS-6.5-x86_64",
-               "cluster_name": "cluster_01",
+               "name": "cluster_01",
                "os_config": {..},
                "package_config": {...},
                "deploy_os_config": {},
-               "deploy_package_config": {}
+               "deploy_package_config": {},
+               "owner": "xxx"
            }
        }
     """
-    pass
+    cluster_info = db_api.cluster.get_cluster(user, cluster_id)
+    cluster_config = db_api.cluster.get_cluster_config(user, cluster_id)
+    cluster_info.update(cluster_config)
 
-def __get_single_host_ipmi(host_id):
-    pass
+    deploy_config = db_api.cluster.get_cluster_deploy_config(user, cluster_id)
+    cluster_info.update(deploy_config)
+
+    return cluster_info
 
 
-def __get_hosts_baseinfo(cluster_id, hosts_id_list):
-    pass
-
-def __get_hosts_details(cluster_id, hosts_id_list):
+def __get_hosts_info(cluster_id, hosts_id_list, user):
     """Get hosts information. Return a dictionary as below,
        {
            "hosts": {
-               1(host_id): {
-                    "host_id": 1,
+               1($clusterhost_id/host_id): {
                     "reinstall_os": True,
-                    "os_version": "CentOS-6.5-x86_64",
-                    "mac_address": "xxx",
-                    "hostname": "xxx",
+                    "mac": "xxx",
+                    "name": "xxx",
                     },
                     "networks": {
-                         "interfaces": {
-                             "eth0": {
-                                 "ip": "192.168.1.1",
-                                 "netmask": "255.255.255.0",
-                                 "is_mgmt": True,
-                                 "is_promiscuous": False,
-                                 "subnet": "192.168.1.0/24"
-                             },
-                             "eth1": {...}
-                         }
+                        "eth0": {
+                            "ip": "192.168.1.1",
+                            "netmask": "255.255.255.0",
+                            "is_mgmt": True,
+                            "is_promiscuous": False,
+                            "subnet": "192.168.1.0/24"
+                        },
+                        "eth1": {...}
                     },
                     "os_config": {},
                     "package_config": {},
@@ -158,28 +170,31 @@ def __get_hosts_details(cluster_id, hosts_id_list):
        }
     """
     hosts_info = {}
-    for host_id in hosts_id_list:
-        host_info = db_api.get_host(host_id)
-        hosts_info[host_id] = host_info
+    for clusterhost_id in hosts_id_list:
+        info = db_api.cluster.get_cluster_host(user, cluster_id,
+                                               clusterhost_id)
+        host_id = info[const.HOST_ID]
+        temp = db_api.host.get_host(user, host_id)
+        info.update(temp)
+
+        networks = info[const.NETWORKS]
+        if isinstance(networks, list):
+            networks_dict = {}
+            for entity in networks:
+                nic_info = {}
+                nic_info = {
+                    entity[const.NIC]: {
+                        const.IP_ADDR: entity[const.IP_ADDR],
+                        const.NETMASK: entity[const.NETMASK],
+                        const.MGMT_NIC_FLAG: entity[const.MGMT_NIC_FLAG],
+                        const.PROMISCUOUS_FLAG: entity[const.PROMISCUOUS_FLAG],
+                        const.SUBNET: entity[const.SUBNET]
+                    }
+                }
+                networks_dict.update(nic_info)
+
+            info[const.NETWORKS] = networks_dict
+
+        hosts_info[host_id] = info
 
     return hosts_info
-
-
-def __get_hosts_ipmi_info(hosts_id_list):
-    """Get IPMI info for each host. The return format will be:
-       {
-           "hosts": {
-               1: {
-                   "hostname": "xxx",
-                   "ipmi_credentials": {
-                        "ip": "xxx",
-                        "username": "xxx",
-                        "password": "xxx"
-                   }
-               },
-               2: {...},
-               ....
-           } 
-       }
-    """
-    pass

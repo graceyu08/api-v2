@@ -35,9 +35,7 @@ class CobblerInstaller(OSInstaller):
     USERNAME = 'username'
     PASSWORD = 'password'
 
-    # TODO(grace): URL and host are different.
-    # Be more precise in the naming here.
-    INSTALLER_URL = "cobbler_host"
+    INSTALLER_URL = "cobbler_url"
     TMPL_DIR = 'tmpl_dir'
     SYS_TMPL = 'system.tmpl'
     SYS_TMPL_NAME = 'system.tmpl'

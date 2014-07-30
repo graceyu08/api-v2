@@ -1,56 +1,60 @@
 {
-    "name": "$host.fullname",
+    "name": "$host.name",
     "hostname": "$host.hostname",
     "profile": "$host.profile",
     "gateway": "$host.gateway",
-    "name_servers": "$host.name_servers",
-    "name_servers_search": "$host.search_path",
+    #import simplejson as json
+    #set nameservers = json.dumps($host.nameservers, encoding='utf-8')
+    "name_servers": $nameservers,
+    #set search_path = ' '.join($host.search_path)
+    "name_servers_search": "$search_path",
     "proxy": "$host.http_proxy",
     "modify_interface":
-        #import simplejson
-        #set interfaces = $host.networks.interfaces
+        #set networks = $host.networks
         #set rekeyed = {}
         #set promicnic = ""
-        #for $nic, $val in $interfaces.iteritems():
-            #set ip_key = '-'.join(('ipaddress', $nic))                          
-            #set netmask_key = '-'.join(('netmask', $nic))                       
-            #set mgmt_key = '-'.join(('management', $nic))                       
-            #set static_key = '-'.join(('static', $nic))                         
-            #set $rekeyed[$ip_key] = $val.ip                                     
-            #set $rekeyed[$netmask_key] = $val.netmask                           
-            #set $rekeyed[$mgmt_key] = $val.is_mgmt                              
-            #set $rekeyed[$static_key] = True                                    
-                           
+        #for $nic, $val in $networks.iteritems():
+            #set ip_key = '-'.join(('ipaddress', $nic))
+            #set netmask_key = '-'.join(('netmask', $nic))
+            #set mgmt_key = '-'.join(('management', $nic))
+            #set static_key = '-'.join(('static', $nic))
+            #set $rekeyed[$ip_key] = $val.ip
+            #set $rekeyed[$netmask_key] = $val.netmask
+            #set $rekeyed[$mgmt_key] = $val.is_mgmt
+            #set $rekeyed[$static_key] = True
+
             #if $val.is_promiscuous:
                 #set promicnic = $nic
-            #end if    
-            #if $val.is_mgmt:                                                        
-                #set mac_key = '-'.join(('macaddress', $nic))                          
-                #set dns_key = '-'.join(('dns', $nic))                                 
-                #set $rekeyed[$mac_key] = $host.mac_address                            
-                #set $rekeyed[$dns_key] = $host.dns                                    
+            #end if
+            #if $val.is_mgmt:
+                #set mac_key = '-'.join(('macaddress', $nic))
+                #set dns_key = '-'.join(('dns', $nic))
+                #set $rekeyed[$mac_key] = $host.mac
+                #set $rekeyed[$dns_key] = $host.dns
             #end if
         #end for
-        #set str=simplejson.dumps($rekeyed, encoding='utf-8')
-        $str
+        #set nic_info = json.dumps($rekeyed, encoding='utf-8')
+        $nic_info
     ,
     "ksmeta":{
-        "username": "$host.server_credentials.username",
-        #import crypt
-        #set $password = crypt.crypt($host.server_credentials.password, "az")
-        "password": "$password",
-        #set path_list = []
-        #for k,v in $host.partition.iteritems()
-            #if v['vol_percentage']
-                #set path_list.append(k + ' ' + v['vol_percentage'] + '%')
-            #else
-                #set path_list.append(k + ' ' + v['vol_size'])
+        #set partition_config = ''
+        #for k, v in $host.partition.iteritems():
+            #set path = ''
+            #if v['vol_percentage']:
+                #set $path = k + ' ' + str(v['vol_percentage']) + '%'
+            #else:
+                #set $path = k + ' ' + str(v['vol_size'])
+            #end if
+            #set partition_config = ';'.join((partition_config, $path))
         #end for
-        #set $partition_config = ';'.join($path_list)
+        #set partition_config = partition_config[1:]
+        #set $password = crypt.crypt($host.server_credentials.password, "az")
+        "username": "$host.server_credentials.username",
+        "password": "$password",
         "promisc_nics": "$promicnic",
         "partition": "$partition_config",
         "https_proxy": "$host.https_proxy",
-        "ignore_proxy": "$host.ignore_proxy",
-        "ntp_server": "$host.ntp_server"
+        "ntp_server": "$host.ntp_server",
+        "timezone": "$host.timezone"
     }
 }
