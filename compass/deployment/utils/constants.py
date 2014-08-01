@@ -15,16 +15,17 @@
 """All keywords variables in deployment are defined in this module."""
 
 
-#General keywords
+# General keywords
 CLUSTER = 'cluster'
 HOST = 'host'
+HOSTS = 'hosts'
 ID = 'id'
 NAME = 'name'
 PASSWORD = 'password'
 USERNAME = 'username'
 
 
-#Adapter info related keywords
+# Adapter info related keywords
 DIST_SYS_NAME = 'distributed_system_name'
 INSTALLER_SETTINGS = 'settings'
 METADATA = 'metadata'
@@ -33,12 +34,12 @@ OS_INSTALLER = 'os_installer'
 SUPPORT_OSES = 'supported_oses'
 
 
-#Cluster info related keywords
+# Cluster info related keywords
 ADAPTER_ID = 'adapter_id'
-OS_VERSION = 'os_version'
+OS_VERSION = 'os_name'
 
 
-#Host info related keywords
+# Host info related keywords
 DNS = 'dns'
 DOMAIN = 'domain'
 HOST_ID = 'host_id'
@@ -57,12 +58,15 @@ REINSTALL_OS_FLAG = 'reinstall_os'
 SUBNET = 'subnet'
 
 
-#Cluster/host config related keywords
-DEPLOY_OS_CONFIG = 'deploy_os_config'
-DEPLOY_PK_CONFIG = 'deploy_package_config'
+# Cluster/host config related keywords
+COMPLETED_PK_CONFIG = 'completed_package_config'
+COMPLETED_OS_CONFIG = 'completed_os_config'
+DEPLOYED_OS_CONFIG = 'deployed_os_config'
+DEPLOYED_PK_CONFIG = 'deployed_package_config'
 NETWORK_MAPPING = 'network_mapping'
 PK_CONFIG = 'package_config'
 OS_CONFIG = 'os_config'
 OS_CONFIG_GENERAL = 'general'
 ROLES = 'roles'
 ROLES_MAPPING = 'roles_mapping'
+TMPL_VARS_DICT = 'vars_dict'

@@ -25,7 +25,8 @@ import unittest2
 os.environ['COMPASS_IGNORE_SETTING'] = 'true'
 
 
-from compass.deployment.installers.os_installers.cobbler.cobbler import CobblerInstaller
+from compass.deployment.installers.os_installers.cobbler.cobbler \
+    import CobblerInstaller
 from compass.tests.deployment.test_data import config_data
 from compass.utils import setting_wrapper as setting
 reload(setting)
@@ -137,9 +138,9 @@ class TestCobblerInstaller(unittest2.TestCase):
                 "management-vnet1": False,
                 "static-vnet1": True
             },
-            "ksmeta":{
+            "ksmeta": {
                 "promisc_nics": "",
-                "timezone" : "UTC",
+                "timezone": "UTC",
                 "partition": "/test 10%;/var 30%;/home 40%",
                 "https_proxy": "",
                 "ntp_server": "127.0.0.1",
@@ -150,7 +151,7 @@ class TestCobblerInstaller(unittest2.TestCase):
             }
         }
         package_config = {
-            1:{
+            1: {
                 "chef_url": "https://127.0.0.1",
                 "chef_client_name": "server01.test",
                 "chef_node_name": "server01.test",
@@ -159,7 +160,7 @@ class TestCobblerInstaller(unittest2.TestCase):
         }
         host_id = 1
         self.test_cobbler.set_package_installer_config(package_config)
-        output = self.test_cobbler._get_system_config(host_id,
-            self.expected_host_vars_dict)
+        output = self.test_cobbler._get_system_config(
+            host_id, self.expected_host_vars_dict)
         self.maxDiff = None
         self.assertEqual(expected_system_config, output)

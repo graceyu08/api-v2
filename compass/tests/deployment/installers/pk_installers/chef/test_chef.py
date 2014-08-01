@@ -17,10 +17,10 @@
 """Test Chef installer module.
 """
 
-import os
-import unittest2
 from copy import deepcopy
 from mock import Mock
+import os
+import unittest2
 
 
 os.environ['COMPASS_IGNORE_SETTING'] = 'true'
@@ -101,10 +101,10 @@ class TestChefInstaller(unittest2.TestCase):
                 "db": {
                     "bind_interface": "vnet0",
                     "compute": {
-                      "host": "12.234.32.100"
+                        "host": "12.234.32.100"
                     },
                     "identity": {
-                      "host": "12.234.32.100"
+                        "host": "12.234.32.100"
                     }
                 },
                 "mq": {

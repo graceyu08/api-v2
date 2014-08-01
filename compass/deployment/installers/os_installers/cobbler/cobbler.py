@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+__author__ = "Grace Yu (grace.yu@huawei.com)"
+
 """os installer cobbler plugin.
 """
 import logging
@@ -45,13 +47,9 @@ class CobblerInstaller(OSInstaller):
     POWER_USER = 'power_user'
     POWER_PASS = 'power_pass'
 
-    # TODO(grace): I am thinking to pass in ConfigManager object
-    # in the contstructor. In other words, the caller should create
-    # ConfigManager object first and pass it in.
     def __init__(self, adapter_info, cluster_info, hosts_info):
         super(CobblerInstaller, self).__init__()
 
-        # TODO(grace): self._config_manager ?
         self.config_manager = CobblerConfigManager(adapter_info,
                                                    cluster_info,
                                                    hosts_info)
@@ -65,45 +63,38 @@ class CobblerInstaller(OSInstaller):
         except KeyError as ex:
             raise KeyError(ex.message)
 
-        # the connection is created when cobbler installer is initialized.
-
-        # TODO(grace): Trailing underscore is a C++ style. In python,
-        # trailing _ is used if the variable would conflict with reserved
-        # keyword in the language.
-        self.remote_ = self._get_cobbler_server(cobbler_host)
-        self.token_ = self._get_token(username, password)
+        # The connection is created when cobbler installer is initialized.
+        self.remote = self._get_cobbler_server(cobbler_host)
+        self.token = self._get_token(username, password)
         self.pk_installer_config = None
 
-        logging.debug('%s instance created', self)
+        logging.debug('%s instance created', 'CobblerInstaller')
 
     def __repr__(self):
         return '%r[name=%r,remote=%r,token=%r' % (
             self.__class__.__name__, self.NAME,
-            self.remote_, self.token_)
+            self.remote, self.token)
 
-    def _get_cobbler_server(self, cobbler_host):
-        if not cobbler_host:
-            logging.error("Cobbler HOST is None!")
-            raise Exception("Cobbler HOST cannot be None!")
+    def _get_cobbler_server(self, cobbler_url):
+        if not cobbler_url:
+            logging.error("Cobbler URL is None!")
+            raise Exception("Cobbler URL cannot be None!")
 
-        return xmlrpclib.Server(cobbler_host)
+        return xmlrpclib.Server(cobbler_url)
 
     def _get_token(self, username, password):
-        if self.remote_ is None:
+        if self.remote is None:
             raise Exception("Cobbler remote instance is None!")
-        return self.remote_.login(username, password)
+        return self.remote.login(username, password)
 
     def get_supported_oses(self):
         """get supported os versions.
-
-        :returns: list of os version.
-
         .. note::
            In cobbler, we treat profile name as the indicator
            of os version. It is just a simple indicator
            and not accurate.
         """
-        profiles = self.remote_.get_profiles()
+        profiles = self.remote.get_profiles()
         oses = []
         for profile in profiles:
             oses.append(profile['name'])
@@ -111,37 +102,73 @@ class CobblerInstaller(OSInstaller):
 
     def deploy(self):
         """Sync cobbler to catch up the latest update config and start to
-           install OS.
+           install OS. Return both cluster and hosts deploy configs. The return
+           format:
+           {
+               "cluster": {
+                   "id": 1,
+                   "deployed_os_config": {},
+               },
+               "hosts": {
+                    1($clusterhost_id): {
+                         "deployed_os_config": {...},
+                    },
+                    ....
+               }
+           }
         """
         os_version = self.config_manager.get_os_version()
         profile = self._get_profile_from_server(os_version)
 
         global_vars_dict = self._get_cluster_tmpl_vars_dict()
 
-        host_ids = self.config_manager.get_host_id_list()
-        for host_id in host_ids:
-            fullname = self.config_manager.get_host_fullname(host_id)
-            vars_dict = self._get_host_tmpl_vars_dict(host_id, global_vars_dict,
+        clusterhost_ids = self.config_manager.get_host_id_list()
+        hosts_deploy_config = {}
+
+        for host_id in clusterhost_ids:
+            fullname = self.config_manager.get_host_name(host_id)
+            vars_dict = self._get_host_tmpl_vars_dict(host_id,
+                                                      global_vars_dict,
                                                       fullname=fullname,
                                                       profile=profile)
 
             self.update_host_config_to_cobbler(host_id, fullname, vars_dict)
+
+            # set host deploy config
+            temp = {}
+            temp = self.config_manager.get_host_deploy_os_config(host_id)
+            temp[const.TMPL_VARS_DICT] = vars_dict
+            hosts_deploy_config[host_id][const.DEPLOY_OS_CONFIG] = temp
+
+        # set cluster deploy config
+        cluster_deconfig = self.config_manager.get_cluster_deployed_os_config()
+        cluster_deconfig[const.TMPL_VARS_DICT] = global_vars_dict
+
         # sync to cobbler and trigger installtion.
         self._sync()
 
+        return {
+            const.CLUSTER: {
+                const.ID: self.config_manager.get_cluster_id(),
+                const.DEPLOY_OS_CONFIG: cluster_deconfig
+            },
+            const.HOSTS: hosts_deploy_config
+        }
+
     def clean_progress(self):
         """clean log files and config for hosts which to deploy."""
-        host_list = self.config_manager.get_host_id_list()
+        clusterhost_list = self.config_manager.get_host_id_list()
         log_dir_prefix = compass_setting.INSTALLATION_LOGDIR[self.NAME]
-        for host_id in host_list:
-            fullname = self.config_manager.get_host_fullname(host_id)
+
+        for host_id in clusterhost_list:
+            fullname = self.config_manager.get_host_name(host_id)
             self._clean_log(log_dir_prefix, fullname)
 
     def redeploy(self):
         """redeploy hosts."""
         host_ids = self.config_manager.get_host_id_list()
         for host_id in host_ids:
-            fullname = self.config_manager.get_host_fullname(host_id)
+            fullname = self.config_manager.get_host_name(host_id)
             sys_id = self._get_system_id(fullname)
             if sys_id:
                 self._netboot_enabled(sys_id)
@@ -153,17 +180,21 @@ class CobblerInstaller(OSInstaller):
            OS installation compelets by setting package_config info provided
            by package installer.
 
-           :param package_configs: dict of package installer config info.
+           :param dict package_configs: The dict of config generated by package
+                                        installer for each clusterhost. The IDs
+                                        of clusterhosts are the keys of
+                                        package_configs.
         """
         self.pk_installer_config = package_configs
 
     def _sync(self):
         """Sync the updated config to cobbler and trigger installation."""
         try:
-            self.remote_.sync(self.token_)
+            self.remote.sync(self.token)
             logging.debug('sync %s', self)
             os.system('sudo service rsyslog restart')
         except Exception as ex:
+            logging.debug("Failed to sync cobbler server! Error:", ex.message)
             raise ex
 
     def _get_system_config(self, host_id, vars_dict):
@@ -174,11 +205,10 @@ class CobblerInstaller(OSInstaller):
         """
         os_version = self.config_manager.get_os_version()
 
-        # TODO(grace): this variable name is potentially misleading.
-        # Change it to system_tmpl_path
-        system_tmpl_dir = os.path.join(os.path.join(self.tmpl_dir, os_version),
+        system_tmpl_path = os.path.join(os.path.join(self.tmpl_dir,
+                                                     os_version),
                                         self.SYS_TMPL_NAME)
-        system_config = self.get_config_from_template(system_tmpl_dir,
+        system_config = self.get_config_from_template(system_tmpl_path,
                                                       vars_dict)
         # update package config info to cobbler ksmeta
         if self.pk_installer_config and host_id in self.pk_installer_config:
@@ -191,7 +221,7 @@ class CobblerInstaller(OSInstaller):
 
     def _get_profile_from_server(self, os_version):
         """Get profile from cobbler server."""
-        result = self.remote_.find_profile({'name': os_version})
+        result = self.remote.find_profile({'name': os_version})
         if not result:
             raise Exception("Cannot find profile for '%s'", os_version)
 
@@ -202,14 +232,15 @@ class CobblerInstaller(OSInstaller):
         """get system reference id for the host."""
         sys_name = fullname
         sys_id = None
-        system_info = self.remote_.find_system({"name": fullname})
+        system_info = self.remote.find_system({"name": fullname})
+
         if not system_info:
-            #Create a new system
-            sys_id = self.remote_.new_system(self.token_)
-            self.remote_.modify_system(sys_id, "name", fullname, self.token_)
+            # Create a new system
+            sys_id = self.remote.new_system(self.token)
+            self.remote.modify_system(sys_id, "name", fullname, self.token)
             logging.debug('create new system %s for %s', sys_id, sys_name)
         else:
-            sys_id = self.remote_.get_system_handle(sys_name, self.token_)
+            sys_id = self.remote.get_system_handle(sys_name, self.token)
 
         return sys_id
 
@@ -217,7 +248,7 @@ class CobblerInstaller(OSInstaller):
         """clean system."""
         sys_name = fullname
         try:
-            self.remote_.remove_system(sys_name, self.token_)
+            self.remote.remove_system(sys_name, self.token)
             logging.debug('system %s is removed', sys_name)
         except Exception:
             logging.debug('no system %s found to remove', sys_name)
@@ -225,15 +256,14 @@ class CobblerInstaller(OSInstaller):
     def _update_system_config(self, sys_id, system_config):
         """update modify system."""
         for key, value in system_config.iteritems():
-            self.remote_.modify_system(sys_id, str(key), value, self.token_)
+            self.remote.modify_system(sys_id, str(key), value, self.token)
 
-        self.remote_.save_system(sys_id, self.token_)
+        self.remote.save_system(sys_id, self.token)
 
     def _netboot_enabled(self, sys_id):
         """enable netboot."""
-        self.remote_.modify_system(sys_id, 'netboot_enabled',
-                                   True, self.token_)
-        self.remote_.save_system(sys_id, self.token_)
+        self.remote.modify_system(sys_id, 'netboot_enabled', True, self.token)
+        self.remote.save_system(sys_id, self.token)
 
     def _clean_log(self, log_dir_prefix, system_name):
         """clean log."""
@@ -259,7 +289,7 @@ class CobblerInstaller(OSInstaller):
         """Delete the host from cobbler server and clean up the installation
            progress.
         """
-        fullname = self.config_manager.get_host_fullname(host_id)
+        fullname = self.config_manager.get_host_name(host_id)
         try:
             log_dir_prefix = compass_setting.INSTALLATION_LOGDIR[self.NAME]
             self._clean_system(fullname)
@@ -282,7 +312,7 @@ class CobblerInstaller(OSInstaller):
             profile = self._get_profile_from_server(os_version)
         vars_dict[self.PROFILE] = profile
 
-        # Set fullname, MAC address and hostname, networks, and dns
+        # Set fullname, MAC address and hostname, networks, dns and so on.
         host_baseinfo = self.config_manager.get_host_baseinfo(host_id)
         util.merge_dict(vars_dict, host_baseinfo)
 
@@ -294,7 +324,7 @@ class CobblerInstaller(OSInstaller):
                                                           host_os_config)
         util.merge_dict(vars_dict, host_vars_dict)
 
-        return {'host': vars_dict}
+        return {const.HOST: vars_dict}
 
     def _get_cluster_tmpl_vars_dict(self):
         os_config_metadata = self.config_manager.get_os_config_metadata()
@@ -309,8 +339,8 @@ class CobblerInstaller(OSInstaller):
             logging.info("System is None!")
             return False
 
-        fullname = self.config_manager.get_host_fullname(host_id)
-        system = self.remote_.get_system_as_rendered(fullname)
+        fullname = self.config_manager.get_host_name(host_id)
+        system = self.remote.get_system_as_rendered(fullname)
         if system[self.POWER_TYPE] != 'ipmilan' or not system[self.POWER_USER]:
             ipmi_info = self.config_manager.get_host_ipmi_info(host_id)
             if not ipmi_info:
@@ -329,30 +359,30 @@ class CobblerInstaller(OSInstaller):
         return True
 
     def poweron(self, host_id):
-        fullname = self.config_manager.get_host_fullname(host_id)
+        fullname = self.config_manager.get_host_name(host_id)
         sys_id = self._get_system_id(fullname)
         if not self._check_and_set_system_impi(sys_id):
             return
 
-        self.remote_.power_system(sys_id, self.token_, power='on')
+        self.remote.power_system(sys_id, self.token, power='on')
         logging.info("Host with ID=%d starts to power on!" % host_id)
 
     def poweroff(self, host_id):
-        fullname = self.config_manager.get_host_fullname(host_id)
+        fullname = self.config_manager.get_host_name(host_id)
         sys_id = self._get_system_id(fullname)
         if not self._check_and_set_system_impi(sys_id):
             return
 
-        self.remote_.power_system(sys_id, self.token_, power='off')
+        self.remote.power_system(sys_id, self.token, power='off')
         logging.info("Host with ID=%d starts to power off!" % host_id)
 
     def reset(self, host_id):
-        fullname = self.config_manager.get_host_fullname(host_id)
+        fullname = self.config_manager.get_host_name(host_id)
         sys_id = self._get_system_id(fullname)
         if not self._check_and_set_system_impi(sys_id):
             return
 
-        self.remote_.power_system(sys_id, self.token_, power='reboot')
+        self.remote.power_system(sys_id, self.token, power='reboot')
         logging.info("Host with ID=%d starts to reboot!" % host_id)
 
 

@@ -17,6 +17,14 @@ ERROR_MSG = {
     'findNoCluster': 'Cannot find the Cluster, ID is %d',
 }
 
+def get_cluster_metadata(user, cluster_id):
+    pass
+
+def get_cluster_deploy_config(user, cluster_id):
+    pass
+
+def get_cluster_host(user, cluster_id, clusterhost_id):
+    pass
 
 @wrap_to_dict()
 def get_cluster(cluster_id):

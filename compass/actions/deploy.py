@@ -14,7 +14,6 @@
 
 """Module to deploy a given cluster
 """
-import logging
 
 from compass.actions import util
 from compass.db import api as db_api
@@ -35,15 +34,18 @@ def deploy(cluster_id, hosts_id_list, user=None):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
-        cluster_info = __get_cluster_info(cluster_id, user)
+        cluster_info = ActionHelper.get_cluster_info(cluster_id, user)
         adapter_id = cluster_info[const.ADAPTER_ID]
 
-        adapter_info = __get_adapter_info(adapter_id, cluster_id, user)
-        hosts_info = __get_hosts_info(hosts_id_list, user)
+        adapter_info = ActionHelper.get_adapter_info(adapter_id, cluster_id,
+                                                     user)
+        hosts_info = ActionHelper.get_hosts_info(hosts_id_list, user)
 
         deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
         deploy_manager.prepare_for_deploy()
-        deploy_manager.deploy()
+        deployed_config = deploy_manager.deploy()
+
+        ActionHelper.save_deployed_config(deployed_config, user)
 
 
 def redeploy(cluster_id, hosts_id_list, user=None):
@@ -56,11 +58,15 @@ def redeploy(cluster_id, hosts_id_list, user=None):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
-        cluster_info = __get_cluster_info(cluster_id)
-        adapter_id = cluster_info[const.ADAPTER_ID] 
+        cluster_info = ActionHelper.get_cluster_info(cluster_id)
+        adapter_id = cluster_info[const.ADAPTER_ID]
 
-        adapter_info = __get_adapter_info(adapter_id, cluster_id, user)
-        hosts_info = __get_hosts_info(cluster_id, hosts_id_list, user)
+        adapter_info = ActionHelper.get_adapter_info(adapter_id,
+                                                     cluster_id,
+                                                     user)
+        hosts_info = ActionHelper.get_hosts_info(cluster_id,
+                                                 hosts_id_list,
+                                                 user)
 
         deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
         deploy_manager.prepare_for_deploy()
@@ -71,14 +77,19 @@ def poweron(host_id):
     """Power on a list of hosts."""
     pass
 
+
 def poweroff(host_id):
     pass
+
 
 def reset(host_id):
     pass
 
 
-def __get_adapter_info(adapter_id, cluster_id, user):
+class ActionHelper(object):
+
+    @staticmethod
+    def get_adapter_info(adapter_id, cluster_id, user):
         """Get adapter information. Return a dictionary as below,
            {
               "id": 1,
@@ -114,87 +125,108 @@ def __get_adapter_info(adapter_id, cluster_id, user):
 
         return adapter_info
 
-def __get_cluster_info(cluster_id, user):
-    """Get cluster information.Return a dictionary as below,
-       {
-           "cluster": {
-               "id": 1,
-               "adapter_id": 1,
-               "os_version": "CentOS-6.5-x86_64",
-               "name": "cluster_01",
-               "os_config": {..},
-               "package_config": {...},
-               "deploy_os_config": {},
-               "deploy_package_config": {},
-               "owner": "xxx"
+    @staticmethod
+    def get_cluster_info(cluster_id, user):
+        """Get cluster information.Return a dictionary as below,
+           {
+               "cluster": {
+                   "id": 1,
+                   "adapter_id": 1,
+                   "os_version": "CentOS-6.5-x86_64",
+                   "name": "cluster_01",
+                   "os_config": {..},
+                   "package_config": {...},
+                   "deployed_os_config": {},
+                   "deployed_package_config": {},
+                   "owner": "xxx"
+               }
            }
-       }
-    """
-    cluster_info = db_api.cluster.get_cluster(user, cluster_id)
-    cluster_config = db_api.cluster.get_cluster_config(user, cluster_id)
-    cluster_info.update(cluster_config)
+        """
+        cluster_info = db_api.cluster.get_cluster(user, cluster_id)
+        cluster_config = db_api.cluster.get_cluster_config(user, cluster_id)
+        cluster_info.update(cluster_config)
 
-    deploy_config = db_api.cluster.get_cluster_deploy_config(user, cluster_id)
-    cluster_info.update(deploy_config)
+        deploy_config = db_api.cluster.get_cluster_deploy_config(user,
+                                                                 cluster_id)
+        cluster_info.update(deploy_config)
 
-    return cluster_info
+        return cluster_info
 
-
-def __get_hosts_info(cluster_id, hosts_id_list, user):
-    """Get hosts information. Return a dictionary as below,
-       {
-           "hosts": {
-               1($clusterhost_id/host_id): {
-                    "reinstall_os": True,
-                    "mac": "xxx",
-                    "name": "xxx",
-                    },
-                    "networks": {
-                        "eth0": {
-                            "ip": "192.168.1.1",
-                            "netmask": "255.255.255.0",
-                            "is_mgmt": True,
-                            "is_promiscuous": False,
-                            "subnet": "192.168.1.0/24"
+    @staticmethod
+    def get_hosts_info(cluster_id, hosts_id_list, user):
+        """Get hosts information. Return a dictionary as below,
+           {
+               "hosts": {
+                   1($clusterhost_id/host_id): {
+                        "reinstall_os": True,
+                        "mac": "xxx",
+                        "name": "xxx",
                         },
-                        "eth1": {...}
-                    },
-                    "os_config": {},
-                    "package_config": {},
-                    "deploy_os_config": {},
-                    "deploy_package_config": {}
-               },
-               2: {...},
-               ....
+                        "networks": {
+                            "eth0": {
+                                "ip": "192.168.1.1",
+                                "netmask": "255.255.255.0",
+                                "is_mgmt": True,
+                                "is_promiscuous": False,
+                                "subnet": "192.168.1.0/24"
+                            },
+                            "eth1": {...}
+                        },
+                        "os_config": {},
+                        "package_config": {},
+                        "deployed_os_config": {},
+                        "deployed_package_config": {}
+                   },
+                   2: {...},
+                   ....
+               }
            }
-       }
-    """
-    hosts_info = {}
-    for clusterhost_id in hosts_id_list:
-        info = db_api.cluster.get_cluster_host(user, cluster_id,
-                                               clusterhost_id)
-        host_id = info[const.HOST_ID]
-        temp = db_api.host.get_host(user, host_id)
-        info.update(temp)
+        """
+        hosts_info = {}
+        for clusterhost_id in hosts_id_list:
+            info = db_api.cluster.get_cluster_host(user, cluster_id,
+                                                   clusterhost_id)
+            host_id = info[const.HOST_ID]
+            temp = db_api.host.get_host(user, host_id)
+            # Delete 'id' from temp
+            del temp['id']
+            info.update(temp)
 
-        networks = info[const.NETWORKS]
-        if isinstance(networks, list):
+            networks = info[const.NETWORKS]
             networks_dict = {}
-            for entity in networks:
+            # Convert networks from list to dictionary format
+            for entry in networks:
                 nic_info = {}
                 nic_info = {
-                    entity[const.NIC]: {
-                        const.IP_ADDR: entity[const.IP_ADDR],
-                        const.NETMASK: entity[const.NETMASK],
-                        const.MGMT_NIC_FLAG: entity[const.MGMT_NIC_FLAG],
-                        const.PROMISCUOUS_FLAG: entity[const.PROMISCUOUS_FLAG],
-                        const.SUBNET: entity[const.SUBNET]
+                    entry[const.NIC]: {
+                        const.IP_ADDR: entry[const.IP_ADDR],
+                        const.NETMASK: entry[const.NETMASK],
+                        const.MGMT_NIC_FLAG: entry[const.MGMT_NIC_FLAG],
+                        const.PROMISCUOUS_FLAG: entry[const.PROMISCUOUS_FLAG],
+                        const.SUBNET: entry[const.SUBNET]
                     }
                 }
                 networks_dict.update(nic_info)
 
             info[const.NETWORKS] = networks_dict
 
-        hosts_info[host_id] = info
+            hosts_info[clusterhost_id] = info
 
-    return hosts_info
+        return hosts_info
+
+    @staticmethod
+    def save_deployed_config(self, deployed_config, user=None):
+        cluster_config = deployed_config[const.CLUSTER]
+        cluster_id = cluster_config[const.CLUSTER][const.ID]
+        del cluster_config[const.CLUSTER][const.ID]
+        # TODO: db_api set cluster deploy config
+        db_api.cluster.update_deployed_config(cluster_id, cluster_config, user)
+
+        hosts_id_list = deployed_config[const.HOSTS].keys()
+        for clusterhost_id in hosts_id_list:
+            config = deployed_config[const.HOSTS][clusterhost_id]
+
+            db_api.cluster.update_clusterhost_deployed_config(cluster_id,
+                                                              clusterhost_id,
+                                                              config,
+                                                              user)

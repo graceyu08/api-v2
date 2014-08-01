@@ -54,7 +54,7 @@ adapter_test_config = {
                 },
                 "http_proxy": {
                     "_self": {
-                         "mapping_to": "http_proxy"
+                        "mapping_to": "http_proxy"
                     }
                 },
                 "ntp_server": {
@@ -105,23 +105,23 @@ adapter_test_config = {
                         "mapping_to": "service_credentials"
                     },
                     "rabbit_mq": {
-                         "_self": {
-                             "mapping_to": "mq"
-                         },
-                         "username": {
-                             "_self": {
-                                 "mapping_to": "username"
-                             }
-                         },
-                         "password": {
-                             "_self": {
-                                 "mapping_to": "password"
-                             }
-                         }
+                        "_self": {
+                            "mapping_to": "mq"
+                        },
+                        "username": {
+                            "_self": {
+                                "mapping_to": "username"
+                            }
+                        },
+                        "password": {
+                            "_self": {
+                                "mapping_to": "password"
+                            }
+                        }
                     }
                 }
             },
-            "network_mapping":{
+            "network_mapping": {
                 "_self": {},
                 "management": {
                     "_self": {},
@@ -152,7 +152,7 @@ adapter_test_config = {
 
 cluster_test_config = {
     "id": 1,
-    "os_version": "Ubuntu-12.04-x86_64",
+    "os_name": "Ubuntu-12.04-x86_64",
     "name": "test",
     "os_config": {
         "general": {
@@ -286,7 +286,7 @@ hosts_test_config = {
                 "/test": {
                     "max_size": 10,
                     "size_percentage": 20
-               }
+                }
             }
         },
         "package_config": {

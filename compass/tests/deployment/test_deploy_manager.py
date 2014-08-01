@@ -24,14 +24,12 @@ import unittest2
 os.environ['COMPASS_IGNORE_SETTING'] = 'true'
 
 
-from copy import deepcopy
 from compass.utils import setting_wrapper as setting
+from copy import deepcopy
 reload(setting)
 
 
 from compass.deployment.deploy_manager import DeployManager
-from compass.deployment.installers.pk_installers.chef_installer.chef_installer import ChefInstaller
-from compass.deployment.installers.os_installers.cobbler.cobbler import CobblerInstaller
 from compass.tests.deployment.test_data import config_data
 
 
@@ -48,8 +46,8 @@ class TestDeployManager(unittest2.TestCase):
         cluster_info = deepcopy(config_data.cluster_test_config)
         hosts_info = deepcopy(config_data.hosts_test_config)
 
-        DeployManager.get_installer = Mock()
-        DeployManager.get_installer.return_value = "mock_installer"
+        DeployManager._get_installer = Mock()
+        DeployManager._get_installer.return_value = "mock_installer"
 
         test_manager = DeployManager(adapter_info, cluster_info, hosts_info)
         self.assertIsNotNone(test_manager)

@@ -47,6 +47,10 @@ class BaseInstaller(object):
         raise NotImplementedError
 
     def get_tmpl_vars_from_metadata(self, metadata, config):
+        """Get variables dictionary for rendering templates from metadata.
+           :param dict metadata: The metadata dictionary.
+           :param dict config: The
+        """
         template_vars = {}
         self._get_tmpl_vars_helper(metadata, config, template_vars)
 
@@ -56,7 +60,7 @@ class BaseInstaller(object):
         """Get the keyword which the input key maps to. This keyword will be
            added to dictionary used to render templates.
 
-           If the key in metadata has a mapping to another keyword which is 
+           If the key in metadata has a mapping to another keyword which is
            used for templates, then return this keyword. If the key is started
            with '$', which is a variable in metadata, return the key itself as
            the mapping keyword. If the key has no mapping, return None.
@@ -70,7 +74,7 @@ class BaseInstaller(object):
         if is_regular_key:
             try:
                 mapping_to = metadata['_self']['mapping_to']
-            except:
+            except Exception:
                 mapping_to = None
         return mapping_to
 
@@ -84,7 +88,7 @@ class BaseInstaller(object):
         """
         if key in metadata:
             return (True, metadata[key])
-    
+
         temp = deepcopy(metadata)
         del temp['_self']
         meta_key = temp.keys()[0]
@@ -120,15 +124,12 @@ class BaseInstaller(object):
         return config
 
     @classmethod
-    def get_installer(cls, name, path, **kwargs):
+    def get_installer(cls, name, path, adapter_info, cluster_info, hosts_info):
         installer = None
         try:
             mod_file, path, descr = imp.find_module(name, [path])
             if mod_file:
                 mod = imp.load_module(name, mod_file, path, descr)
-                adapter_info = kwargs['adapter_info']
-                cluster_info = kwargs['cluster_info']
-                hosts_info = kwargs['hosts_info']
                 return getattr(mod, mod.NAME)(adapter_info, cluster_info,
                                               hosts_info)
 
@@ -155,8 +156,9 @@ class OSInstaller(BaseInstaller):
     def get_installer(cls, name, adapter_info, cluster_info, hosts_info):
         path = os.path.join(cls.INSTALLER_BASE_DIR, name)
         installer = super(OSInstaller, cls).get_installer(name, path,
-            adapter_info=adapter_info, cluster_info=cluster_info,
-            hosts_info=hosts_info)
+                                                          adapter_info,
+                                                          cluster_info,
+                                                          hosts_info)
 
         if not isinstance(installer, OSInstaller):
             logging.info("Installer '%s' is not an OS installer!" % name)
@@ -201,8 +203,9 @@ class PKInstaller(BaseInstaller):
     def get_installer(cls, name, adapter_info, cluster_info, hosts_info):
         path = os.path.join(cls.INSTALLER_BASE_DIR, name)
         installer = super(PKInstaller, cls).get_installer(name, path,
-            adapter_info=adapter_info, cluster_info=cluster_info,
-            hosts_info=hosts_info)
+                                                          adapter_info,
+                                                          cluster_info,
+                                                          hosts_info)
 
         if not isinstance(installer, PKInstaller):
             logging.info("Installer '%s' is not a package installer!" % name)

@@ -14,5 +14,5 @@
 
 """modules to read/write cluster/host config from installers.
 
-   .. moduleauthor:: Xiaodong Wang <xiaodongwang@huawei.com>
+   .. moduleauthor:: Grace Yu <grace.yu@huawei.com>
 """

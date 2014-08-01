@@ -14,51 +14,48 @@
 """Module to get configs from provider and isntallers and update
    them to provider and installers.
 """
-import logging
-
-from compass.db import db_api
 from compass.deployment.installers.installer import PKInstaller
 from compass.deployment.installers.installer import OSInstaller
 from compass.deployment.utils import constants as const
+from compass.utils import util
+
+
+import logging
 
 
 class DeployManager(object):
+    """Deploy manager module."""
     def __init__(self, adapter_info, cluster_info, hosts_info):
         os_installer_name = adapter_info[const.OS_INSTALLER][const.NAME]
         pk_installer_name = adapter_info[const.PK_INSTALLER][const.NAME]
 
         os_hosts_info = self._get_hosts_for_os_installation(hosts_info)
 
-        self.os_installer = DeployManager.get_installer(OSInstaller,
-                                                        os_installer_name,
-                                                        adapter_info,
-                                                        cluster_info,
-                                                        os_hosts_info)
-        self.pk_installer = DeployManager.get_installer(PKInstaller,
-                                                        pk_installer_name,
-                                                        adapter_info,
-                                                        cluster_info,
-                                                        hosts_info)
+        self.os_installer = DeployManager._get_installer(OSInstaller,
+                                                         os_installer_name,
+                                                         adapter_info,
+                                                         cluster_info,
+                                                         os_hosts_info)
+        self.pk_installer = DeployManager._get_installer(PKInstaller,
+                                                         pk_installer_name,
+                                                         adapter_info,
+                                                         cluster_info,
+                                                         hosts_info)
+
     @staticmethod
-    def get_installer(installer_type, installer_name, adapter_info,
-                      cluster_info, hosts_info):
-        try:
-            callback = getattr(installer_type, 'get_installer')
-            installer = callback(installer_name, adapter_info, cluster_info,
-                                 hosts_info)
-            if installer is None:
-                raise Exception("Installer '%s' is None!" % installer_name)
-        except Exception as ex:
-            # TODO(grace): In this case, we can get rid of try..except block
-            raise ex
+    def _get_installer(installer_type, name, adapter_info, cluster_info,
+                       hosts_info):
+        """Get installer instance."""
+        callback = getattr(installer_type, 'get_installer')
+        installer = callback(name, adapter_info, cluster_info, hosts_info)
 
         return installer
 
     def clean_progress(self):
         """Clean previous installation log and progress."""
         # Clean DB
-        db_api.cluster.clean_progress(self.cluster_id)
-        db_api.cluster_host.clean_progress(self.cluster_id, self.host_id_list)
+        # db_api.cluster.clean_progress(self.cluster_id)
+        # db_api.cluster.clean_progress(self.cluster_id, self.host_id_list)
 
         # OS installer cleans previous installing progress.
         if self.os_installer:
@@ -73,39 +70,30 @@ class DeployManager(object):
 
     def deploy(self):
         """Deploy the cluster."""
-
-        pk_instl_conf = None
+        deploy_config = {}
+        pk_instl_confs = {}
         if self.pk_installer:
             # generate target system config which will be installed by OS
             # installer right after OS installation is completed.
-            pk_instl_conf = self.package_installer.generate_installer_config()
+            pk_instl_confs = self.package_installer.generate_installer_config()
 
         if self.os_installer:
             # Send package installer config info to OS installer.
-            if pk_instl_conf:
-                self.os_installer.set_package_installer_config(pk_instl_conf)
+            if pk_instl_confs:
+                self.os_installer.set_package_installer_config(pk_instl_confs)
 
             # start to deploy OS
             os_deploy_config = self.os_installer.deploy()
-            self.save_os_deploy_config(os_deploy_config)
+            deploy_config = os_deploy_config
 
         if self.pk_installer:
             pk_deploy_config = self.package_installer.deploy()
-            self.save_pk_deploy_config(pk_deploy_config)
+            util.merge_dict(deploy_config, pk_deploy_config)
 
-    def save_pk_deploy_config(self, packge_deploy_config):
-        """Save package config to DB"""
-        # Sava cluster package config to cluster deploy config column
-        # Save each host package config to host deploy config column
-        #TODO: when db_api is ready
-        pass
-
-    def save_os_deploy_config(self, os_deploy_config):
-        """Save each host's OS deploy config to its deploy config column."""
-        #TODO: when db_api is ready
-        pass
+        return deploy_config
 
     def redeploy(self):
+        """Redeploy the cluster without changing configurations."""
         if self.os_installer:
             self.os_installer.redeploy()
 
@@ -137,11 +125,12 @@ class PowerManager(object):
     """Manage host to power on, power off, and reset. """
     def __init__(self, adapter_info, cluster_info, hosts_info):
         os_installer_name = adapter_info[const.OS_INSTALLER][const.NAME]
-        self.os_installer = DeployManager.get_installer(OSInstaller,
-                                                        os_installer_name,
-                                                        adapter_info,
-                                                        cluster_info,
-                                                        hosts_info)
+        self.os_installer = DeployManager._get_installer(OSInstaller,
+                                                         os_installer_name,
+                                                         adapter_info,
+                                                         cluster_info,
+                                                         hosts_info)
+
     def poweron(self):
         if not self.os_installer:
             logging.info("No OS installer found, cannot power on machine!")
