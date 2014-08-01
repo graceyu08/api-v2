@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+__author__ = "Grace Yu (grace.yu@huawei.com)"
+
+
 """Module to provider installer interface.
 """
 from Cheetah.Template import Template

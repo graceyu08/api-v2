@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+__author__ = "Grace Yu (grace.yu@huawei.com)"
+
+
 """Test deploy_manager module."""
 
 from mock import Mock
