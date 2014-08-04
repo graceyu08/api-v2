@@ -41,17 +41,19 @@ class ChefInstaller(PKInstaller):
 
         self.config_manager = ChefConfigManager(adapter_info, cluster_info,
                                                 hosts_info)
-        self.tmpl_dir = self.config_manager.get_dist_system_tmpl_dir()
-        self.installer_url_ = self.config_manager.get_chef_url()
+        temp_dir = self.config_manager.get_dist_system_tmpl_dir()
+        adapter_name = self.config_manager.get_dist_system_name()
+        self.tmpl_dir = os.path.join(temp_dir, adapter_name)
+
+        self.installer_url = self.config_manager.get_chef_url()
         key, client = self.config_manager.get_chef_credentials()
 
-        self.api_ = self._get_chef_api(key, client)
+        self.chef_api = self._get_chef_api(key, client)
         logging.debug('%s instance created', self)
 
     def __repr__(self):
-        return '%s[name=%s,installer_url=%s,global_databag_name=%s]' % (
-            self.__class__.__name__, self.NAME, self.installer_url_,
-            self.global_databag_name_)
+        return '%s[name=%s,installer_url=%s]' % (
+            self.__class__.__name__, self.NAME, self.installer_url)
 
     def _get_chef_api(self, key=None, client=None):
         """Initializes chef API client."""
@@ -59,7 +61,7 @@ class ChefInstaller(PKInstaller):
         chef_api = None
         try:
             if key and client:
-                chef_api = chef.ChefAPI(self.installer_url_, key, client)
+                chef_api = chef.ChefAPI(self.installer_url, key, client)
             else:
                 chef_api = chef.autoconfigure()
 
@@ -82,7 +84,7 @@ class ChefInstaller(PKInstaller):
            doesnot exist.
         """
         import chef
-        bag = chef.DataBag(databag_name, api=self.api_)
+        bag = chef.DataBag(databag_name, api=self.chef_api)
         bag.save()
         return bag
 
@@ -94,12 +96,12 @@ class ChefInstaller(PKInstaller):
            :param str env_name: The environment name for this node.
         """
         import chef
-        if not self.api_:
+        if not self.chef_api:
             logging.info("Cannot find ChefAPI object!")
             raise Exception("Cannot find ChefAPI object!")
 
-        node = chef.Node(node_name, api=self.api_)
-        if node not in chef.Node.list(api=self.api_):
+        node = chef.Node(node_name, api=self.chef_api)
+        if node not in chef.Node.list(api=self.chef_api):
             if env_name:
                 node.chef_environment = env_name
             node.save()
@@ -131,7 +133,7 @@ class ChefInstaller(PKInstaller):
         # Delete node and its client on chef server
         try:
             node.delete()
-            client = chef.Client(client_name, api=self.api_)
+            client = chef.Client(client_name, api=self.chef_api)
             client.delete()
             logging.debug('delete node %s', node_name)
             log_dir_prefix = setting.INSTALLATION_LOGDIR[self.NAME]
@@ -219,7 +221,7 @@ class ChefInstaller(PKInstaller):
         """
         import chef
         env_config = self._get_env_attributes(vars_dict)
-        env = chef.Environment(env_name, api=self.api_)
+        env = chef.Environment(env_name, api=self.chef_api)
         for attr in env_config:
             if attr in env.attributes:
                 setattr(env, attr, env_config[attr])
@@ -250,7 +252,8 @@ class ChefInstaller(PKInstaller):
                                                                  vars_dict)
 
             for item, item_values in databagitem_attri.iteritems():
-                databagitem = chef.DataBagItem(databag, item, api=self.api_)
+                databagitem = chef.DataBagItem(databag, item,
+                                               api=self.chef_api)
                 for key, value in item_values.iteritems():
                     databagitem[key] = value
                 databagitem.save()
@@ -333,8 +336,7 @@ class ChefInstaller(PKInstaller):
             node_name = self.config_manager.get_host_name(host_id)
             roles = self.config_manager.get_host_roles(host_id)
 
-            node = self.get_node(node_name)
-            self.set_node_env(node, env_name)
+            node = self.get_node(node_name, env_name)
             vars_dict = self._get_host_tmpl_vars(host_id, global_vars_dict)
             self.update_node(node, roles, vars_dict)
 
@@ -346,6 +348,14 @@ class ChefInstaller(PKInstaller):
         # set cluster deployed config
         cl_config = self.config_manager.get_cluster_deployed_package_config()
         cl_config[const.TMPL_VARS_DICT] = global_vars_dict
+
+        return {
+            const.CLUSTER: {
+                const.ID: cluster_id,
+                const.DEPLOYED_PK_CONFIG: cl_config
+            },
+            const.HOSTS: hosts_deployed_configs
+        }
 
     def generate_installer_config(self):
         """Render chef config file (client.rb) by OS installing right after
@@ -367,7 +377,7 @@ class ChefInstaller(PKInstaller):
             fullname = self.config_manager.get_host_name(host_id)
             temp = {
                 "tool": "chef",
-                "chef_url": self.installer_url_
+                "chef_url": self.installer_url
             }
             temp['chef_client_name'] = fullname
             temp['chef_node_name'] = fullname
@@ -401,7 +411,7 @@ class ChefInstaller(PKInstaller):
     def _clean_databag_item(self, databag, item_name):
         """clean databag item."""
         import chef
-        if item_name not in chef.DataBagItem.list(api=self.api_):
+        if item_name not in chef.DataBagItem.list(api=self.chef_api):
             logging.info("Databag item '%s' is not found!", item_name)
             return
 

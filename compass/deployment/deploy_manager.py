@@ -79,17 +79,27 @@ class DeployManager(object):
             # generate target system config which will be installed by OS
             # installer right after OS installation is completed.
             pk_instl_confs = self.package_installer.generate_installer_config()
+            logging.debug('[DeployManager][deploy] pk_instl_confs is %s',
+                          pk_instl_confs)
 
         if self.os_installer:
+            logging.info('[DeployManager][deploy]get OS installer %s',
+                         self.os_installer)
             # Send package installer config info to OS installer.
             if pk_instl_confs:
                 self.os_installer.set_package_installer_config(pk_instl_confs)
 
             # start to deploy OS
-            os_deploy_config = self.os_installer.deploy()
-            deploy_config = os_deploy_config
+            try:
+                os_deploy_config = self.os_installer.deploy()
+                deploy_config = os_deploy_config
+            except Exception as ex:
+                logging.error(ex.message)
 
         if self.pk_installer:
+            logging.info('DeployManager][deploy]get package installer %s',
+                         self.pk_installer)
+
             pk_deploy_config = self.package_installer.deploy()
             util.merge_dict(deploy_config, pk_deploy_config)
 

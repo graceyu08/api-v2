@@ -16,12 +16,18 @@
 """
 
 from compass.actions import util
-from compass.db import api as db_api
+from compass.db.api import adapter_holder as adapter_db
+from compass.db.api import cluster as cluster_db
+from compass.db.api import host as host_db
+from compass.db.api import user as user_db
 from compass.deployment.deploy_manager import DeployManager
 from compass.deployment.utils import constants as const
 
 
-def deploy(cluster_id, hosts_id_list, user=None):
+import logging
+
+
+def deploy(cluster_id, hosts_id_list, username=None):
     """Deploy clusters.
 
     :param cluster_hosts: clusters and hosts in each cluster to deploy.
@@ -34,6 +40,8 @@ def deploy(cluster_id, hosts_id_list, user=None):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
+        user = user_db.get_user_object(username)
+
         cluster_info = ActionHelper.get_cluster_info(cluster_id, user)
         adapter_id = cluster_info[const.ADAPTER_ID]
 
@@ -41,14 +49,18 @@ def deploy(cluster_id, hosts_id_list, user=None):
                                                      user)
         hosts_info = ActionHelper.get_hosts_info(hosts_id_list, user)
 
+        logging.debug('[action][deploy]: adapter_info is %s', adapter_info)
+        logging.debug('[action][deploy]: cluster_info is %s', cluster_info)
+        logging.debug('[action][deploy]: hosts_info is %s', hosts_info)
+
         deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
-        deploy_manager.prepare_for_deploy()
+        #deploy_manager.prepare_for_deploy()
         deployed_config = deploy_manager.deploy()
 
         ActionHelper.save_deployed_config(deployed_config, user)
 
 
-def redeploy(cluster_id, hosts_id_list, user=None):
+def redeploy(cluster_id, hosts_id_list, username=None):
     """Deploy clusters.
 
     :param cluster_hosts: clusters and hosts in each cluster to deploy.
@@ -58,7 +70,8 @@ def redeploy(cluster_id, hosts_id_list, user=None):
         if not lock:
             raise Exception('failed to acquire lock to deploy')
 
-        cluster_info = ActionHelper.get_cluster_info(cluster_id)
+        user = user_db.get_user_object(username)
+        cluster_info = ActionHelper.get_cluster_info(cluster_id, user)
         adapter_id = cluster_info[const.ADAPTER_ID]
 
         adapter_info = ActionHelper.get_adapter_info(adapter_id,
@@ -69,7 +82,7 @@ def redeploy(cluster_id, hosts_id_list, user=None):
                                                  user)
 
         deploy_manager = DeployManager(adapter_info, cluster_info, hosts_info)
-        deploy_manager.prepare_for_deploy()
+        #deploy_manager.prepare_for_deploy()
         deploy_manager.redeploy()
 
 
@@ -115,8 +128,8 @@ class ActionHelper(object):
            }
            To view a complete output, please refer to backend doc.
         """
-        adapter_info = db_api.adapter_holder.get_adapter(user, adapter_id)
-        metadata = db_api.cluster.get_cluster_metadata(user, cluster_id)
+        adapter_info = adapter_db.get_adapter(user, adapter_id)
+        metadata = cluster_db.get_cluster_metadata(user, cluster_id)
         adapter_info.update(metadata)
 
         roles_info = adapter_info[const.ROLES]
@@ -142,12 +155,12 @@ class ActionHelper(object):
                }
            }
         """
-        cluster_info = db_api.cluster.get_cluster(user, cluster_id)
-        cluster_config = db_api.cluster.get_cluster_config(user, cluster_id)
+        cluster_info = cluster_db.get_cluster(user, cluster_id)
+        cluster_config = cluster_db.get_cluster_config(user, cluster_id)
         cluster_info.update(cluster_config)
 
-        deploy_config = db_api.cluster.get_cluster_deploy_config(user,
-                                                                 cluster_id)
+        deploy_config = cluster_db.get_cluster_deployed_config(user,
+                                                               cluster_id)
         cluster_info.update(deploy_config)
 
         return cluster_info
@@ -184,13 +197,15 @@ class ActionHelper(object):
         """
         hosts_info = {}
         for clusterhost_id in hosts_id_list:
-            info = db_api.cluster.get_cluster_host(user, cluster_id,
-                                                   clusterhost_id)
+            info = cluster_db.get_clusterhost(user, clusterhost_id)
             host_id = info[const.HOST_ID]
-            temp = db_api.host.get_host(user, host_id)
+            temp = host_db.get_host(user, host_id)
+            config = cluster_db.get_cluster_host_config(user, cluster_id,
+                                                        host_id)
             # Delete 'id' from temp
             del temp['id']
             info.update(temp)
+            info.update(config)
 
             networks = info[const.NETWORKS]
             networks_dict = {}
@@ -215,18 +230,17 @@ class ActionHelper(object):
         return hosts_info
 
     @staticmethod
-    def save_deployed_config(self, deployed_config, user=None):
+    def save_deployed_config(self, deployed_config, user):
         cluster_config = deployed_config[const.CLUSTER]
-        cluster_id = cluster_config[const.CLUSTER][const.ID]
-        del cluster_config[const.CLUSTER][const.ID]
-        # TODO: db_api set cluster deploy config
-        db_api.cluster.update_deployed_config(cluster_id, cluster_config, user)
+        cluster_id = cluster_config[const.ID]
+        del cluster_config[const.ID]
+
+        cluster_db.update_cluster_deployed_config(user, cluster_id,
+                                                  **cluster_config)
 
         hosts_id_list = deployed_config[const.HOSTS].keys()
         for clusterhost_id in hosts_id_list:
             config = deployed_config[const.HOSTS][clusterhost_id]
-
-            db_api.cluster.update_clusterhost_deployed_config(cluster_id,
-                                                              clusterhost_id,
-                                                              config,
-                                                              user)
+            cluster_db.update_clusterhost_deployed_config(user,
+                                                          clusterhost_id,
+                                                          **config)

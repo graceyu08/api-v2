@@ -119,6 +119,8 @@ class BaseInstaller(object):
     def get_config_from_template(self, tmpl_dir, vars_dict):
         if not os.path.exists(tmpl_dir) or not vars_dict:
             logging.info("Template or variables dict is not specified!")
+            logging.debug("template dir is %s", tmpl_dir)
+            logging.debug("template vars dict is %s", vars_dict)
             return {}
 
         tmpl = Template(file=tmpl_dir, searchList=[vars_dict])
@@ -166,6 +168,8 @@ class OSInstaller(BaseInstaller):
         if not isinstance(installer, OSInstaller):
             logging.info("Installer '%s' is not an OS installer!" % name)
             return None
+
+        return installer
 
     def poweron(self, host_id):
         pass

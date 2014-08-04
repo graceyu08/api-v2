@@ -70,8 +70,7 @@ class CobblerInstaller(OSInstaller):
 
     def __repr__(self):
         return '%r[name=%r,remote=%r,token=%r' % (
-            self.__class__.__name__, self.NAME,
-            self.remote, self.token)
+            self.__class__.__name__, self.remote, self.token)
 
     def _get_cobbler_server(self, cobbler_url):
         if not cobbler_url:
@@ -136,7 +135,8 @@ class CobblerInstaller(OSInstaller):
             temp = {}
             temp = self.config_manager.get_host_deploy_os_config(host_id)
             temp[const.TMPL_VARS_DICT] = vars_dict
-            hosts_deploy_config[host_id][const.DEPLOY_OS_CONFIG] = temp
+            host_config = {const.DEPLOYED_OS_CONFIG: temp}
+            hosts_deploy_config[host_id] = host_config
 
         # set cluster deploy config
         cluster_deconfig = self.config_manager.get_cluster_deployed_os_config()
@@ -148,7 +148,7 @@ class CobblerInstaller(OSInstaller):
         return {
             const.CLUSTER: {
                 const.ID: self.config_manager.get_cluster_id(),
-                const.DEPLOY_OS_CONFIG: cluster_deconfig
+                const.DEPLOYED_OS_CONFIG: cluster_deconfig
             },
             const.HOSTS: hosts_deploy_config
         }

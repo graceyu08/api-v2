@@ -368,7 +368,7 @@ class BaseConfigManager(object):
             logging.info("Adapter Info is None!")
             return None
 
-        return self.adapter_info(const.DIST_SYS_NAME, None)
+        return self.adapter_info.setdefault(const.DIST_SYS_NAME, None)
 
     def get_adapter_roles(self):
         if not self.adapter_info:
